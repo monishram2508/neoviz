@@ -9,7 +9,6 @@ import {
   runCypherQuery,
 } from "./utils/cypherQueryApi";
 
-// Renders the graph visualizer page and coordinates query execution flows.
 function CypherQueryTester() {
   const { state } = useLocation();
   const {
@@ -21,7 +20,7 @@ function CypherQueryTester() {
   } = state || {};
 
   const nodeLabel =
-  selectedNode?.label || localStorage.getItem("nodeLabel");
+    selectedNode?.label || localStorage.getItem("nodeLabel");
 
 
 
@@ -32,9 +31,10 @@ function CypherQueryTester() {
   const [queryType, setQueryType] = useState("");
 
   const [menuOptions, setMenuOptions] = useState([]);
+  const [nlQuestion, setNlQuestion] = useState("");
+  const [generatedCypher, setGeneratedCypher] = useState("");
+  const [nlLoading, setNlLoading] = useState(false);
 
-
-  // Loads menu options derived from incoming and outgoing relationships for the selected label.
   const fetchDynamicMenuOptions = async () => {
     const options = await getDynamicMenuOptions({
       nodeLabel,
@@ -47,7 +47,6 @@ function CypherQueryTester() {
   };
 
 
-  // Builds the graph visualization HTML and stores it for iframe rendering.
   const generateResultsPage = (data, options = {}) => {
     const htmlContent = buildResultsPageContent(data, options);
     if (!htmlContent) return;
@@ -55,74 +54,114 @@ function CypherQueryTester() {
   };
 
   useEffect(() => {
-        // Refreshes menu options whenever the selected label changes.
-        if (nodeLabel) {
-          fetchDynamicMenuOptions();
+    if (nodeLabel) {
+      fetchDynamicMenuOptions();
+    }
+  }, [nodeLabel]);
+
+  useEffect(() => {
+    const handleMessage = async (event) => {
+      if (event.data?.type === "UPDATE_LIMIT") {
+        const { limit } = event.data;
+        try {
+          const updatedQuery = query.replace(/LIMIT \d+/i, `LIMIT ${limit}`);
+          const data = await runCypherQuery({
+            cypher: updatedQuery,
+            uri,
+            username,
+            password,
+          });
+
+          setResult(data);
+          generateResultsPage(data, { allowSelection: browseFullGraph });
+        } catch (err) {
+          console.error("Error updating limit:", err);
         }
-      }, [nodeLabel]);
+      }
+    };
 
-      useEffect(() => {
-      // Handles limit update messages from the embedded graph iframe.
-      const handleMessage = async (event) => {
-        if (event.data?.type === "UPDATE_LIMIT") {
-          const { limit } = event.data;
-          try {
-            const updatedQuery = query.replace(/LIMIT \d+/i, `LIMIT ${limit}`);
-            const data = await runCypherQuery({
-              cypher: updatedQuery,
-              uri,
-              username,
-              password,
-            });
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [query, browseFullGraph]);
 
-            setResult(data);
-            generateResultsPage(data, { allowSelection: browseFullGraph });
-          } catch (err) {
-            console.error("Error updating limit:", err);
-          }
+  useEffect(() => {
+    fetchDynamicMenuOptions();
+  }, [nodeLabel]);
+
+  useEffect(() => {
+    if (browseFullGraph) {
+      const fetchFullGraph = async () => {
+        try {
+          const storedUri = uri || sessionStorage.getItem("neo4j_uri") || localStorage.getItem("neo4j_uri");
+          const storedUsername = username || sessionStorage.getItem("neo4j_username") || localStorage.getItem("neo4j_username");
+          const storedPassword = password || sessionStorage.getItem("neo4j_password") || localStorage.getItem("neo4j_password");
+
+          const data = await fetchFullGraphData({
+            uri: storedUri,
+            username: storedUsername,
+            password: storedPassword,
+          });
+
+          setResult(data);
+          generateResultsPage(data, { allowZoom: true, allowSelection: true });
+
+        } catch (err) {
+          setError("Error loading full graph.");
+          console.error("Error:", err);
         }
       };
 
-      window.addEventListener("message", handleMessage);
-      return () => window.removeEventListener("message", handleMessage);
-    }, [query, browseFullGraph]);
+      fetchFullGraph();
+    }
+  }, [browseFullGraph]);
 
-useEffect(() => {
-  // Triggers menu option loading for the currently active label.
-  fetchDynamicMenuOptions();
-}, [nodeLabel]);
+  const executeNLQuery = async () => {
+    if (!nlQuestion.trim()) {
+      setError("Please type a question.");
+      return;
+    }
+    setError(null);
+    setNlLoading(true);
 
-useEffect(() => {
-  // Loads and renders the full graph when full-browse mode is active.
-  if (browseFullGraph) {
-    // Fetches and renders the full graph when browse mode is enabled.
-    const fetchFullGraph = async () => {
-      try {
-        const storedUri = uri || sessionStorage.getItem("neo4j_uri") || localStorage.getItem("neo4j_uri");
-        const storedUsername = username || sessionStorage.getItem("neo4j_username") || localStorage.getItem("neo4j_username");
-        const storedPassword = password || sessionStorage.getItem("neo4j_password") || localStorage.getItem("neo4j_password");
+    try {
+      const token = localStorage.getItem("token");
 
-        const data = await fetchFullGraphData({
-          uri: storedUri,
-          username: storedUsername,
-          password: storedPassword,
-        });
+      const response = await fetch("http://localhost:3001/nl-query", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          question: nlQuestion,
+          uri,
+          username,
+          password,
+          nodeLabel
+        })
+      });
 
-        setResult(data);
-        generateResultsPage(data, { allowZoom: true, allowSelection: true });
- 
-      } catch (err) {
-        setError("Error loading full graph.");
-        console.error("Error:", err);
+      const result = await response.json();
+
+      if (!response.ok) {
+        setError(result.error || "Something went wrong");
+        if (result.cypher) setGeneratedCypher(result.cypher);
+        return;
       }
-    };
- 
-    fetchFullGraph();
-  }
-}, [browseFullGraph]);
 
+      setGeneratedCypher(result.cypher);
 
-  // Executes the selected Cypher query and renders the result graph.
+      setResult(result.data);
+      generateResultsPage(result.data);
+
+    } catch (err) {
+      setError("Failed to reach backend.");
+      console.error(err);
+    } finally {
+      setNlLoading(false);
+    }
+  };
+
   const executeQuery = async () => {
     if (!query) {
       setError("Please select a query.");
@@ -149,21 +188,19 @@ useEffect(() => {
   };
 
 
-  // Updates the selected query template based on menu selection.
   const handleQueryTypeChange = (e) => {
     const selectedOption = menuOptions.find((opt) => opt.name === e.target.value);
     setQueryType(e.target.value);
     setQuery(selectedOption ? selectedOption.query : "");
   };
 
-  // Clears session storage and redirects back to the home route.
   const handleLogout = () => {
     sessionStorage.clear();
     window.location.href = "/";
   };
 
 
-return (
+  return (
     <div
       className="page-container"
       style={{
@@ -173,81 +210,118 @@ return (
         overflow: browseFullGraph ? "auto" : "hidden",
       }}
     >
-    <div className="header-box">
-      <div className="header-text">
-        <h1 className="title">Graph Visualiser</h1>
-        <p className="subtitle">
-          {browseFullGraph ? "Literary Data From Archive" : `Node: ${nodeLabel}`}
-        </p>
-      </div>
-
-      {error && (
-        <p className="error-box">
-          {error}
-        </p>
-      )}
-
-    {!browseFullGraph && (
-      <div className="query-controls">
-        <SimpleSelect
-            value={queryType}
-            onChange={(val) => {
-              setQueryType(val);
-
-              const selected = menuOptions.find(o => o.value === val);
-              if (selected) {
-                setQuery(selected.query);
-              }
-            }}
-            options={menuOptions}
-          />
-
-
-        <button
-          onClick={executeQuery}
-          className="visualize-btn"
-        >
-          Visualize
-        </button>
-      </div>
-    )}
-
-    </div>
-
-    <div
-      className="results-section"
-      style={{
-        flexGrow: 1,
-        width: "100%",
-        height: browseFullGraph ? "calc(100vh - 200px)" : "75vh",
-        overflowX: browseFullGraph ? "scroll" : "hidden",
-        overflowY: browseFullGraph ? "scroll" : "hidden",
-      }}
-    >
-
-      {resultsPageContent ? (
-        <iframe
-          srcDoc={resultsPageContent}
-          title="Results"
-          style={{
-            width: "100%",
-            height: "100%",
-            border: "none",
-            display: "block",
-            background: "#fff",
-          }}
-        ></iframe>
-
-      ) : (
-        <div className="results-placeholder">
-          Run a query to see graph visualization.
+      <div className="header-box">
+        <div className="header-text">
+          <h1 className="title">Graph Visualiser</h1>
+          <p className="subtitle">
+            {browseFullGraph ? "Literary Data From Archive" : `Node: ${nodeLabel}`}
+          </p>
         </div>
-      )}
-    </div>
-  </div>
-);
 
-  
+        {error && (
+          <p className="error-box">
+            {error}
+          </p>
+        )}
+
+        {!browseFullGraph && (
+          <div className="query-controls">
+            <SimpleSelect
+              value={queryType}
+              onChange={(val) => {
+                setQueryType(val);
+
+                const selected = menuOptions.find(o => o.value === val);
+                if (selected) {
+                  setQuery(selected.query);
+                }
+              }}
+              options={menuOptions}
+            />
+
+
+            <button
+              onClick={executeQuery}
+              className="visualize-btn"
+            >
+              Visualize
+            </button>
+          </div>
+        )}
+
+        <div className="query-controls" style={{ marginTop: "12px", gap: "8px" }}>
+          <input
+            type="text"
+            placeholder="Ask in plain English e.g. Show me all authors"
+            value={nlQuestion}
+            onChange={(e) => setNlQuestion(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") executeNLQuery(); }}
+            style={{
+              flex: 1,
+              padding: "8px 12px",
+              borderRadius: "6px",
+              border: "1px solid #ccc",
+              fontSize: "14px"
+            }}
+          />
+          <button
+            onClick={executeNLQuery}
+            className="visualize-btn"
+            disabled={nlLoading}
+          >
+            {nlLoading ? "Thinking..." : "Ask"}
+          </button>
+        </div>
+
+        {generatedCypher && (
+          <div style={{
+            margin: "8px 16px",
+            padding: "8px 12px",
+            background: "#f0f0f0",
+            borderRadius: "6px",
+            fontSize: "12px",
+            fontFamily: "monospace",
+            color: "#333"
+          }}>
+            Generated Cypher: {generatedCypher}
+          </div>
+        )}
+
+      </div>
+
+      <div
+        className="results-section"
+        style={{
+          flexGrow: 1,
+          width: "100%",
+          height: browseFullGraph ? "calc(100vh - 200px)" : "75vh",
+          overflowX: browseFullGraph ? "scroll" : "hidden",
+          overflowY: browseFullGraph ? "scroll" : "hidden",
+        }}
+      >
+
+        {resultsPageContent ? (
+          <iframe
+            srcDoc={resultsPageContent}
+            title="Results"
+            style={{
+              width: "100%",
+              height: "100%",
+              border: "none",
+              display: "block",
+              background: "#fff",
+            }}
+          ></iframe>
+
+        ) : (
+          <div className="results-placeholder">
+            Run a query to see graph visualization.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
 
 }
 

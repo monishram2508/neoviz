@@ -37,11 +37,11 @@ app.post("/connect", authMiddleware, async (req, res) => {
     username = conn.username;
     password = conn.password;
   }
-if (!/^neo4j(\+s|\+ssc)?:\/\//.test(uri) && !/^bolt(\+s|\+ssc)?:\/\//.test(uri)) {
-  return res.status(400).json({
-    error: "Invalid Neo4j URI scheme. Use neo4j:// or neo4j+s://",
-  });
-}
+  if (!/^neo4j(\+s|\+ssc)?:\/\//.test(uri) && !/^bolt(\+s|\+ssc)?:\/\//.test(uri)) {
+    return res.status(400).json({
+      error: "Invalid Neo4j URI scheme. Use neo4j:// or neo4j+s://",
+    });
+  }
 
   if (!uri || !username || !password) {
     return res.status(400).json({ error: "Missing required parameters" });
@@ -85,11 +85,11 @@ app.post("/query", authMiddleware, async (req, res) => {
     username = conn.username;
     password = conn.password;
   }
-if (!/^neo4j(\+s|\+ssc)?:\/\//.test(uri) && !/^bolt(\+s|\+ssc)?:\/\//.test(uri)) {
-  return res.status(400).json({
-    error: "Invalid Neo4j URI scheme. Use neo4j:// or neo4j+s://",
-  });
-}
+  if (!/^neo4j(\+s|\+ssc)?:\/\//.test(uri) && !/^bolt(\+s|\+ssc)?:\/\//.test(uri)) {
+    return res.status(400).json({
+      error: "Invalid Neo4j URI scheme. Use neo4j:// or neo4j+s://",
+    });
+  }
 
   if (!cypher || !uri || !username || !password) {
     return res.status(400).json({ error: "Missing required parameters" });
@@ -107,7 +107,7 @@ if (!/^neo4j(\+s|\+ssc)?:\/\//.test(uri) && !/^bolt(\+s|\+ssc)?:\/\//.test(uri))
     res.status(500).json({ error: error.message });
   } finally {
     await session.close();
-    await driver.close(); 
+    await driver.close();
   }
 });
 
@@ -122,7 +122,7 @@ app.post("/register", async (req, res) => {
   db.run(
     "INSERT INTO users (email, password) VALUES (?, ?)",
     [email, hashed],
-    function (err) {
+    function(err) {
       if (err) {
         return res.status(400).json({ error: "User already exists" });
       }
@@ -141,7 +141,7 @@ app.post("/login", (req, res) => {
     if (err) return res.status(500).json({ error: "Database error" });
     if (!user) return res.status(400).json({ error: "User not found" });
 
-  const match = await bcrypt.compare(password, user.password);
+    const match = await bcrypt.compare(password, user.password);
     if (!match) return res.status(400).json({ error: "Wrong password" });
 
     const token = jwt.sign({ id: user.id }, SECRET);
@@ -181,7 +181,7 @@ app.post("/save-connection", authMiddleware, (req, res) => {
     `INSERT INTO connections (user_id, uri, username, password, name)
      VALUES (?, ?, ?, ?, ?)`,
     [req.user.id, uri, username, password, name || uri],
-    function (err) {
+    function(err) {
       if (err) {
         console.error(err);
         return res.status(500).json({ error: "Failed to save connection" });
@@ -189,6 +189,67 @@ app.post("/save-connection", authMiddleware, (req, res) => {
       res.json({ success: true, id: this.lastID });
     }
   );
+});
+
+app.post("/nl-query", authMiddleware, async (req, res) => {
+  const { question, uri, username, password, nodeLabel } = req.body;
+
+  if (!question || !uri || !username || !password) {
+    return res.status(400).json({ error: "Missing required parameters" });
+  }
+
+  try {
+    const Groq = require("groq-sdk");
+    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
+    const chatResponse = await groq.chat.completions.create({
+      model: "llama3-70b-8192",
+      messages: [
+        {
+          role: "system",
+          content: `You are a Neo4j Cypher expert. 
+          The user is exploring a graph database with node label: ${nodeLabel}.
+          Convert the user's question into a valid Cypher query.
+          Return ONLY the Cypher query, no explanation, no markdown, no backticks.
+          Always include a LIMIT 50 at the end unless the user specifies otherwise.`
+        },
+        {
+          role: "user",
+          content: question
+        }
+      ]
+    });
+
+    const cypher = chatResponse.choices[0].message.content.trim();
+    console.log("Generated Cypher:", cypher);
+
+    if (!/^neo4j(\+s|\+ssc)?:\/\//.test(uri) && !/^bolt(\+s|\+ssc)?:\/\//.test(uri)) {
+      return res.status(400).json({ error: "Invalid Neo4j URI scheme." });
+    }
+
+    const driver = neo4j.driver(uri, neo4j.auth.basic(username, password));
+    const session = driver.session();
+
+    try {
+      const result = await session.run(cypher);
+      const data = result.records.map((record) => record.toObject());
+      res.json({ data, cypher });
+    } catch (queryError) {
+      console.error("Cypher execution error:", queryError);
+      res.status(500).json({
+        error: "LLM generated an invalid query",
+        cypher,
+        details: queryError.message
+      });
+    } finally {
+      await session.close();
+      await driver.close();
+    }
+
+  } catch (err) {
+    console.error("Groq error:", err);
+    res.status(500).json({ error: "Failed to generate Cypher from question" });
+  }
 });
 
 app.post("/sendContribution", authMiddleware, (req, res) => {

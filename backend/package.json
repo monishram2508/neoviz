@@ -13,10 +13,11 @@
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
     "d3": "^7.9.0",
-    "dotenv": "^17.4.1",
-    "express": "^4.22.1",
+    "dotenv": "^17.4.2",
+    "express": "^4.22.2",
+    "groq-sdk": "^1.2.0",
     "jsonwebtoken": "^9.0.3",
     "neo4j-driver": "^5.28.3",
-    "sqlite3": "^5.1.6"
+    "sqlite3": "^6.0.1"
   }
 }
