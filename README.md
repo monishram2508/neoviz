@@ -10,7 +10,7 @@
 
 NeoViz is a schema-agnostic web application for exploring and visualizing Neo4j property graphs — no Cypher knowledge required. Connect to any Neo4j instance, browse its structure interactively, and query it in plain English using AI-powered natural language processing.
 
-Built as part of a research project at the [Data Science and Analytics Centre (DSAC)](https://dsac.in), continuing work originally started under BTP 2025/26.
+Built as part of a research project at the [Data Science and Analytics Centre (DSAC)](https://dsac.iiit.ac.in/), continuing work originally started under BTP 2025/26.
 
 ---
 
