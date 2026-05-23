@@ -1,128 +1,102 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import "./auth.css";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const navigate = useNavigate();
 
   const handleLogin = async () => {
-    const res = await fetch("http://localhost:3001/login", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ email, password })
-    });
-
-    const data = await res.json();
-
-    if (data.token) {
-      localStorage.setItem("token", data.token);
-      navigate("/configuration");
-    } else {
-      alert(data.error || "Login failed");
+    setError("");
+    setLoading(true);
+    try {
+      const res = await fetch("http://localhost:3001/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (data.token) {
+        localStorage.setItem("token", data.token);
+        navigate("/configuration");
+      } else {
+        setError(data.error || "Login failed");
+      }
+    } catch {
+      setError("Cannot reach server. Is the backend running?");
+    } finally {
+      setLoading(false);
     }
   };
 
-return (
-  <div
-    style={{
-      height: "100vh",
-      display: "flex",
-      background: "#f5f5f5",
-      fontFamily: "sans-serif"
-    }}
-  >
-    {/* LEFT SIDE — INFO */}
-    <div
-      style={{
-        flex: 1,
-        padding: "3rem",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-        background: "#111827",
-        color: "white"
-      }}
-    >
-      <h1 style={{ fontSize: "2.5rem", marginBottom: "1rem" }}>
-        Neo4j Explorer
-      </h1>
+  return (
+    <div className="auth-root">
+      <div className="auth-grid" />
 
-    <p style={{ fontSize: "1.1rem", marginBottom: "1.5rem", opacity: 0.9 }}>
-    A domain-agnostic platform for exploring and visualizing interconnected data across diverse knowledge systems!
-    </p>
+      {/* LEFT PANEL */}
+      <div className="auth-left">
+        <div className="auth-left-inner">
+          <div className="auth-brand">
+            <span className="auth-brand-icon">⬡</span>
+            <span className="auth-brand-name">NEOVIZ</span>
+          </div>
+          <h1 className="auth-headline">
+            Graph databases,<br />
+            <span>made human.</span>
+          </h1>
+          <p className="auth-desc">
+            Connect to any Neo4j instance and explore its structure
+            through interactive visualization and natural language queries.
+          </p>
+        </div>
+      </div>
 
-    <ul style={{ lineHeight: "1.8", opacity: 0.85 }}>
-    <li>🔍 Explore complex graph structures intuitively</li>
-    <li>🔗 Navigate relationships across entities</li>
-    <li>📊 Interactive, query-driven visualizations</li>
-    </ul>
-    </div>
+      {/* RIGHT PANEL */}
+      <div className="auth-right">
+        <div className="auth-card">
+          <div className="auth-card-top-line" />
+          <p className="auth-card-label">SIGN IN</p>
+          <h2 className="auth-card-title">Welcome back</h2>
 
-    {/* RIGHT SIDE — LOGIN */}
-    <div
-      style={{
-        flex: 1,
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center"
-      }}
-    >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: "400px",
-          background: "white",
-          padding: "2rem",
-          borderRadius: "10px",
-          boxShadow: "0 8px 20px rgba(0,0,0,0.1)",
-          display: "flex",
-          flexDirection: "column",
-          gap: "1rem"
-        }}
-      >
-        <h2 style={{ textAlign: "center" }}>Login</h2>
+          {error && <div className="auth-error">{error}</div>}
 
-        <input
-          placeholder="Email"
-          onChange={(e) => setEmail(e.target.value)}
-          style={{ padding: "0.75rem", borderRadius: "6px", border: "1px solid #ccc" }}
-        />
+          <div className="auth-field">
+            <label className="auth-field-label">EMAIL</label>
+            <input
+              className="auth-input"
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+            />
+          </div>
 
-        <input
-          type="password"
-          placeholder="Password"
-          onChange={(e) => setPassword(e.target.value)}
-          style={{ padding: "0.75rem", borderRadius: "6px", border: "1px solid #ccc" }}
-        />
+          <div className="auth-field">
+            <label className="auth-field-label">PASSWORD</label>
+            <input
+              className="auth-input"
+              type="password"
+              placeholder="••••••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+            />
+          </div>
 
-        <button
-          onClick={handleLogin}
-          style={{
-            padding: "0.75rem",
-            background: "#333",
-            color: "white",
-            border: "none",
-            borderRadius: "6px",
-            cursor: "pointer"
-          }}
-        >
-          Login
-        </button>
+          <button className="auth-btn" onClick={handleLogin} disabled={loading}>
+            {loading ? "SIGNING IN..." : "SIGN IN →"}
+          </button>
 
-        <p style={{ textAlign: "center", fontSize: "0.9rem" }}>
-          Don’t have an account?{" "}
-          <span
-            style={{ color: "#2563eb", cursor: "pointer" }}
-            onClick={() => navigate("/register")}
-          >
-            Register!
-          </span>
-        </p>
+          <p className="auth-switch">
+            No account?{" "}
+            <span onClick={() => navigate("/register")}>Register here</span>
+          </p>
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
 }

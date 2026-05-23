@@ -19,33 +19,29 @@ function CypherQueryTester() {
     browseFullGraph = false,
   } = state || {};
 
-  const nodeLabel =
-    selectedNode?.label || localStorage.getItem("nodeLabel");
-
-
+  const nodeLabel = selectedNode?.label || localStorage.getItem("nodeLabel");
 
   const [query, setQuery] = useState("");
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [resultsPageContent, setResultsPageContent] = useState("");
   const [queryType, setQueryType] = useState("");
-
   const [menuOptions, setMenuOptions] = useState([]);
+
+  // Phase 1 — natural language query state
   const [nlQuestion, setNlQuestion] = useState("");
   const [generatedCypher, setGeneratedCypher] = useState("");
   const [nlLoading, setNlLoading] = useState(false);
 
+  // Derive a short host label from the URI for the status badge
+  const dbHost = uri ? uri.replace(/^neo4j\+s?:\/\//, "").split(".")[0] : "disconnected";
+  const isConnected = !!uri;
+
   const fetchDynamicMenuOptions = async () => {
-    const options = await getDynamicMenuOptions({
-      nodeLabel,
-      uri,
-      username,
-      password,
-    });
+    const options = await getDynamicMenuOptions({ nodeLabel, uri, username, password });
     if (!options) return;
     setMenuOptions(options);
   };
-
 
   const generateResultsPage = (data, options = {}) => {
     const htmlContent = buildResultsPageContent(data, options);
@@ -54,9 +50,7 @@ function CypherQueryTester() {
   };
 
   useEffect(() => {
-    if (nodeLabel) {
-      fetchDynamicMenuOptions();
-    }
+    if (nodeLabel) fetchDynamicMenuOptions();
   }, [nodeLabel]);
 
   useEffect(() => {
@@ -65,13 +59,7 @@ function CypherQueryTester() {
         const { limit } = event.data;
         try {
           const updatedQuery = query.replace(/LIMIT \d+/i, `LIMIT ${limit}`);
-          const data = await runCypherQuery({
-            cypher: updatedQuery,
-            uri,
-            username,
-            password,
-          });
-
+          const data = await runCypherQuery({ cypher: updatedQuery, uri, username, password });
           setResult(data);
           generateResultsPage(data, { allowSelection: browseFullGraph });
         } catch (err) {
@@ -79,14 +67,11 @@ function CypherQueryTester() {
         }
       }
     };
-
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
   }, [query, browseFullGraph]);
 
-  useEffect(() => {
-    fetchDynamicMenuOptions();
-  }, [nodeLabel]);
+  useEffect(() => { fetchDynamicMenuOptions(); }, [nodeLabel]);
 
   useEffect(() => {
     if (browseFullGraph) {
@@ -95,90 +80,23 @@ function CypherQueryTester() {
           const storedUri = uri || sessionStorage.getItem("neo4j_uri") || localStorage.getItem("neo4j_uri");
           const storedUsername = username || sessionStorage.getItem("neo4j_username") || localStorage.getItem("neo4j_username");
           const storedPassword = password || sessionStorage.getItem("neo4j_password") || localStorage.getItem("neo4j_password");
-
-          const data = await fetchFullGraphData({
-            uri: storedUri,
-            username: storedUsername,
-            password: storedPassword,
-          });
-
+          const data = await fetchFullGraphData({ uri: storedUri, username: storedUsername, password: storedPassword });
           setResult(data);
           generateResultsPage(data, { allowZoom: true, allowSelection: true });
-
         } catch (err) {
           setError("Error loading full graph.");
           console.error("Error:", err);
         }
       };
-
       fetchFullGraph();
     }
   }, [browseFullGraph]);
 
-  const executeNLQuery = async () => {
-    if (!nlQuestion.trim()) {
-      setError("Please type a question.");
-      return;
-    }
-    setError(null);
-    setNlLoading(true);
-
-    try {
-      const token = localStorage.getItem("token");
-
-      const response = await fetch("http://localhost:3001/nl-query", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          question: nlQuestion,
-          uri,
-          username,
-          password,
-          nodeLabel
-        })
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        setError(result.error || "Something went wrong");
-        if (result.cypher) setGeneratedCypher(result.cypher);
-        return;
-      }
-
-      setGeneratedCypher(result.cypher);
-
-      setResult(result.data);
-      generateResultsPage(result.data);
-
-    } catch (err) {
-      setError("Failed to reach backend.");
-      console.error(err);
-    } finally {
-      setNlLoading(false);
-    }
-  };
-
   const executeQuery = async () => {
-    if (!query) {
-      setError("Please select a query.");
-      return;
-    }
+    if (!query) { setError("Please select a query."); return; }
     setError(null);
-
     try {
-      console.log("Sending cypher:", query);
-
-      const data = await runCypherQuery({
-        cypher: query,
-        uri,
-        username,
-        password,
-      });
-
+      const data = await runCypherQuery({ cypher: query, uri, username, password });
       setResult(data);
       generateResultsPage(data);
     } catch (err) {
@@ -187,6 +105,34 @@ function CypherQueryTester() {
     }
   };
 
+  // Phase 1 — NL query handler
+  const executeNLQuery = async () => {
+    if (!nlQuestion.trim()) { setError("Please type a question."); return; }
+    setError(null);
+    setNlLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("http://localhost:3001/nl-query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({ question: nlQuestion, uri, username, password, nodeLabel }),
+      });
+      const res = await response.json();
+      if (!response.ok) {
+        setError(res.error || "Something went wrong");
+        if (res.cypher) setGeneratedCypher(res.cypher);
+        return;
+      }
+      setGeneratedCypher(res.cypher);
+      setResult(res.data);
+      generateResultsPage(res.data);
+    } catch (err) {
+      setError("Failed to reach backend.");
+      console.error(err);
+    } finally {
+      setNlLoading(false);
+    }
+  };
 
   const handleQueryTypeChange = (e) => {
     const selectedOption = menuOptions.find((opt) => opt.name === e.target.value);
@@ -199,7 +145,6 @@ function CypherQueryTester() {
     window.location.href = "/";
   };
 
-
   return (
     <div
       className="page-container"
@@ -211,84 +156,84 @@ function CypherQueryTester() {
       }}
     >
       <div className="header-box">
+
+        {/* ── ROW 1: brand + connection status + logout ── */}
         <div className="header-text">
-          <h1 className="title">Graph Visualiser</h1>
-          <p className="subtitle">
-            {browseFullGraph ? "Literary Data From Archive" : `Node: ${nodeLabel}`}
-          </p>
+          <div className="title">NEOVIZ</div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+            {/* connection status */}
+            <div className="conn-status">
+              <span className={`conn-dot${isConnected ? "" : " offline"}`} />
+              {isConnected ? dbHost : "not connected"}
+            </div>
+
+            {/* static feature pills */}
+            <div className="feature-pills">
+              <span className="pill">INTERACTIVE GRAPH</span>
+              <span className="pill">NL → CYPHER</span>
+              <span className="pill">{browseFullGraph ? "FULL GRAPH" : nodeLabel?.toUpperCase()}</span>
+            </div>
+
+            <button onClick={handleLogout} className="logout-btn">LOGOUT</button>
+          </div>
         </div>
 
-        {error && (
-          <p className="error-box">
-            {error}
-          </p>
-        )}
+        {error && <div className="error-box">{error}</div>}
 
+        {/* ── ROW 2: query controls (only in node mode) ── */}
         {!browseFullGraph && (
-          <div className="query-controls">
-            <SimpleSelect
-              value={queryType}
-              onChange={(val) => {
-                setQueryType(val);
+          <>
+            {/* predefined query selector */}
+            <div className="query-controls">
+              <SimpleSelect
+                value={queryType}
+                onChange={(val) => {
+                  setQueryType(val);
+                  const selected = menuOptions.find((o) => o.value === val);
+                  if (selected) setQuery(selected.query);
+                }}
+                options={menuOptions}
+              />
+              <button onClick={executeQuery} className="visualize-btn">
+                VISUALIZE
+              </button>
+            </div>
 
-                const selected = menuOptions.find(o => o.value === val);
-                if (selected) {
-                  setQuery(selected.query);
-                }
-              }}
-              options={menuOptions}
-            />
+            {/* NL query row */}
+            <div className="query-controls">
+              <div className="nl-input-wrap">
+                <span className="nl-prefix">ASK →</span>
+                <input
+                  className="nl-input"
+                  type="text"
+                  placeholder='e.g. "Show me all connected nodes"'
+                  value={nlQuestion}
+                  onChange={(e) => setNlQuestion(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && executeNLQuery()}
+                />
+              </div>
+              <button
+                onClick={executeNLQuery}
+                className="visualize-btn"
+                disabled={nlLoading}
+              >
+                {nlLoading ? "THINKING..." : "RUN"}
+              </button>
+            </div>
 
-
-            <button
-              onClick={executeQuery}
-              className="visualize-btn"
-            >
-              Visualize
-            </button>
-          </div>
+            {/* generated cypher preview */}
+            {generatedCypher && (
+              <div className="cypher-preview-strip">
+                <span className="label">CYPHER</span>
+                <span className="code">{generatedCypher}</span>
+              </div>
+            )}
+          </>
         )}
-
-        <div className="query-controls" style={{ marginTop: "12px", gap: "8px" }}>
-          <input
-            type="text"
-            placeholder="Ask in plain English e.g. Show me all authors"
-            value={nlQuestion}
-            onChange={(e) => setNlQuestion(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") executeNLQuery(); }}
-            style={{
-              flex: 1,
-              padding: "8px 12px",
-              borderRadius: "6px",
-              border: "1px solid #ccc",
-              fontSize: "14px"
-            }}
-          />
-          <button
-            onClick={executeNLQuery}
-            className="visualize-btn"
-            disabled={nlLoading}
-          >
-            {nlLoading ? "Thinking..." : "Ask"}
-          </button>
-        </div>
-
-        {generatedCypher && (
-          <div style={{
-            margin: "8px 16px",
-            padding: "8px 12px",
-            background: "#f0f0f0",
-            borderRadius: "6px",
-            fontSize: "12px",
-            fontFamily: "monospace",
-            color: "#333"
-          }}>
-            Generated Cypher: {generatedCypher}
-          </div>
-        )}
-
       </div>
 
+      {/* ── GRAPH AREA ── */}
       <div
         className="results-section"
         style={{
@@ -299,30 +244,21 @@ function CypherQueryTester() {
           overflowY: browseFullGraph ? "scroll" : "hidden",
         }}
       >
-
         {resultsPageContent ? (
           <iframe
             srcDoc={resultsPageContent}
             title="Results"
-            style={{
-              width: "100%",
-              height: "100%",
-              border: "none",
-              display: "block",
-              background: "#fff",
-            }}
-          ></iframe>
-
+            style={{ width: "100%", height: "100%", border: "none", display: "block", background: "#010D1C" }}
+          />
         ) : (
           <div className="results-placeholder">
-            Run a query to see graph visualization.
+            <span className="results-placeholder-icon">⬡</span>
+            <span>// run a query to render the graph</span>
           </div>
         )}
       </div>
     </div>
   );
-
-
 }
 
 export default CypherQueryTester;
