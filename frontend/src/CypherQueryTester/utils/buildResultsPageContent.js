@@ -1,14 +1,67 @@
-// Builds the self-contained HTML document rendered inside the graph iframe.
-// Design language matches the app shell: light neutral, Inter, soft shadows.
+
 
 const PALETTE = [
-  { bg: "#e0f2fe", border: "#38bdf8", text: "#0369a1" },
-  { bg: "#dcfce7", border: "#4ade80", text: "#15803d" },
-  { bg: "#fef9c3", border: "#facc15", text: "#854d0e" },
-  { bg: "#f3e8ff", border: "#c084fc", text: "#7e22ce" },
-  { bg: "#ffe4e6", border: "#fb7185", text: "#9f1239" },
-  { bg: "#ffedd5", border: "#fb923c", text: "#c2410c" },
-];
+{ bg: "#e0f2fe", border: "#38bdf8", text: "#0369a1" },
+{ bg: "#dcfce7", border: "#4ade80", text: "#15803d" },
+{ bg: "#fef9c3", border: "#facc15", text: "#854d0e" },
+{ bg: "#f3e8ff", border: "#c084fc", text: "#7e22ce" },
+{ bg: "#ffe4e6", border: "#fb7185", text: "#9f1239" },
+{ bg: "#ffedd5", border: "#fb923c", text: "#c2410c" }];
+
+const THEMES = {
+  light: {
+    bodyBg: "#fafafa",
+    dots: "#cfcfd5",
+    cardBg: "#ffffff",
+    cardBorder: "#e4e4e7",
+    cardBorderHover: "#d4d4d8",
+    nameColor: "#18181b",
+    linkStroke: "#d0d0d5",
+    linkLabel: "#71717a",
+    linkHalo: "#fafafa",
+    arrow: "#c0c0c6",
+    chipBg: "rgba(255,255,255,0.92)",
+    chipBorder: "#e4e4e7",
+    chipText: "#52525b",
+    ctrlBg: "#ffffff",
+    ctrlHover: "#f4f4f5",
+    ctrlText: "#52525b",
+    ctrlTextHover: "#18181b",
+    ctrlDivider: "#f0f0f2",
+    hintBg: "rgba(24,24,27,0.78)",
+    hintText: "#ffffff",
+    emptyText: "#a1a1aa",
+    emptySub: "#c4c4c9",
+    cmpLink: "#818cf8",
+    cmpLabel: "#6366f1"
+  },
+  dark: {
+    bodyBg: "#101012",
+    dots: "#26262c",
+    cardBg: "#1c1c21",
+    cardBorder: "#33333a",
+    cardBorderHover: "#45454d",
+    nameColor: "#f4f4f5",
+    linkStroke: "#3f3f46",
+    linkLabel: "#a1a1aa",
+    linkHalo: "#101012",
+    arrow: "#52525b",
+    chipBg: "rgba(28,28,33,0.92)",
+    chipBorder: "#33333a",
+    chipText: "#a1a1aa",
+    ctrlBg: "#1c1c21",
+    ctrlHover: "#28282e",
+    ctrlText: "#a1a1aa",
+    ctrlTextHover: "#f4f4f5",
+    ctrlDivider: "#28282e",
+    hintBg: "rgba(63,63,70,0.92)",
+    hintText: "#f4f4f5",
+    emptyText: "#71717a",
+    emptySub: "#52525b",
+    cmpLink: "#6366f1",
+    cmpLabel: "#818cf8"
+  }
+};
 
 function getLabelColor(label) {
   let hash = 0;
@@ -16,7 +69,10 @@ function getLabelColor(label) {
   return PALETTE[Math.abs(hash) % PALETTE.length];
 }
 
-export const buildResultsPageContent = (data) => {
+export const buildResultsPageContent = (data, opts = {}) => {
+  const theme = THEMES[opts.theme === "dark" ? "dark" : "light"];
+  const compareTitles = Array.isArray(opts.compareTitles) ? opts.compareTitles : [];
+
   const nodes = [];
   const links = [];
   const seen = new Set();
@@ -32,6 +88,9 @@ export const buildResultsPageContent = (data) => {
           source: entry.startNodeElementId,
           target: entry.endNodeElementId,
           type: entry.type,
+
+          weight: entry.weight || 0,
+          undirected: !!entry.undirected
         });
       } else if (entry.elementId && entry.labels && entry.properties) {
         if (!seen.has(entry.elementId)) {
@@ -39,15 +98,13 @@ export const buildResultsPageContent = (data) => {
           nodes.push({
             id: entry.elementId,
             label: entry.labels[0] || "Node",
-            properties: entry.properties,
+            properties: entry.properties
           });
         }
       }
     });
   });
 
-  // Drop links whose endpoints didn't come back (e.g. OPTIONAL MATCH nulls),
-  // and de-duplicate relationships returned by multiple records.
   const linkSeen = new Set();
   const validLinks = links.filter((l) => {
     if (!seen.has(l.source) || !seen.has(l.target)) return false;
@@ -69,7 +126,7 @@ export const buildResultsPageContent = (data) => {
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    background: #fafafa;
+    background: ${theme.bodyBg};
     overflow: hidden;
     width: 100vw; height: 100vh;
     opacity: 0;
@@ -82,7 +139,7 @@ export const buildResultsPageContent = (data) => {
     width: 100%; height: 100%;
     position: relative; overflow: hidden;
     cursor: grab;
-    background-image: radial-gradient(circle, #cfcfd5 1.4px, transparent 1.4px);
+    background-image: radial-gradient(circle, ${theme.dots} 1.4px, transparent 1.4px);
     background-size: 24px 24px;
   }
   #container:active { cursor: grabbing; }
@@ -101,8 +158,8 @@ export const buildResultsPageContent = (data) => {
 
   .node-card {
     position: absolute;
-    background: #ffffff;
-    border: 1px solid #e4e4e7;
+    background: ${theme.cardBg};
+    border: 1px solid ${theme.cardBorder};
     border-radius: 11px;
     padding: var(--card-pad);
     cursor: pointer;
@@ -114,11 +171,27 @@ export const buildResultsPageContent = (data) => {
   }
   .node-card:hover {
     box-shadow: 0 2px 4px rgba(0,0,0,0.06), 0 8px 22px rgba(0,0,0,0.10);
-    border-color: #d4d4d8;
+    border-color: ${theme.cardBorderHover};
   }
   .node-card.selected {
     border-color: #4f46e5;
     box-shadow: 0 0 0 3px rgba(79,70,229,0.16), 0 8px 22px rgba(0,0,0,0.08);
+  }
+  .node-card.compared {
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 3px rgba(245,158,11,0.22), 0 8px 22px rgba(0,0,0,0.08);
+  }
+  .node-card.compared::after {
+    content: "✓";
+    position: absolute;
+    top: -8px; right: -8px;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: #f59e0b;
+    color: #fff;
+    font-size: 12px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
   }
   .node-accent {
     position: absolute;
@@ -127,7 +200,7 @@ export const buildResultsPageContent = (data) => {
     border-radius: 0 3px 3px 0;
   }
   .node-name {
-    font-size: var(--name-fs); font-weight: 600; color: #18181b;
+    font-size: var(--name-fs); font-weight: 600; color: ${theme.nameColor};
     letter-spacing: -0.01em;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     margin-bottom: 4px;
@@ -143,23 +216,24 @@ export const buildResultsPageContent = (data) => {
   }
 
   .link-label-text {
-    font-size: 10px; font-weight: 500; fill: #71717a;
+    font-size: 10px; font-weight: 500; fill: ${theme.linkLabel};
     pointer-events: none;
     font-family: 'Inter', -apple-system, sans-serif;
     letter-spacing: 0.02em;
-    paint-order: stroke; stroke: #fafafa; stroke-width: 3px; stroke-linejoin: round;
+    paint-order: stroke; stroke: ${theme.linkHalo}; stroke-width: 3px; stroke-linejoin: round;
   }
+  .link-label-text.cmp { fill: ${theme.cmpLabel}; font-weight: 600; }
 
-  /* overlays */
+  
   .overlay-chip {
     position: absolute;
-    background: rgba(255,255,255,0.92);
+    background: ${theme.chipBg};
     backdrop-filter: blur(6px);
-    border: 1px solid #e4e4e7;
+    border: 1px solid ${theme.chipBorder};
     border-radius: 9px;
     box-shadow: 0 1px 2px rgba(0,0,0,0.04);
     font-size: 11.5px;
-    color: #52525b;
+    color: ${theme.chipText};
     padding: 6px 11px;
     z-index: 50;
     user-select: none;
@@ -183,34 +257,34 @@ export const buildResultsPageContent = (data) => {
   }
   .ctrl-group {
     display: flex; flex-direction: column;
-    border: 1px solid #e4e4e7;
+    border: 1px solid ${theme.chipBorder};
     border-radius: 10px;
     overflow: hidden;
     box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-    background: #fff;
+    background: ${theme.ctrlBg};
   }
   .ctrl-group button {
     width: 34px; height: 32px;
-    background: #ffffff;
+    background: ${theme.ctrlBg};
     border: none;
     font-size: 13px;
     font-weight: 600;
-    color: #52525b;
+    color: ${theme.ctrlText};
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     transition: background 0.12s, color 0.12s;
     font-family: 'Inter', -apple-system, sans-serif;
   }
-  .ctrl-group button + button { border-top: 1px solid #f0f0f2; }
-  .ctrl-group button:hover { background: #f4f4f5; color: #18181b; }
+  .ctrl-group button + button { border-top: 1px solid ${theme.ctrlDivider}; }
+  .ctrl-group button:hover { background: ${theme.ctrlHover}; color: ${theme.ctrlTextHover}; }
   #zin, #zout { font-size: 15px; font-weight: 400; }
 
   #hint {
     position: absolute;
     bottom: 14px; left: 50%;
     transform: translateX(-50%);
-    background: rgba(24,24,27,0.78);
-    color: #fff;
+    background: ${theme.hintBg};
+    color: ${theme.hintText};
     font-size: 11px;
     padding: 6px 12px;
     border-radius: 7px;
@@ -224,11 +298,11 @@ export const buildResultsPageContent = (data) => {
     position: absolute; inset: 0;
     display: flex; flex-direction: column;
     align-items: center; justify-content: center; gap: 10px;
-    color: #a1a1aa;
+    color: ${theme.emptyText};
   }
   .empty-icon { font-size: 28px; opacity: 0.5; }
   .empty-text { font-size: 13px; }
-  .empty-sub { font-size: 12px; color: #c4c4c9; }
+  .empty-sub { font-size: 12px; color: ${theme.emptySub}; }
 </style>
 <script src="https://d3js.org/d3.v6.min.js"></script>
 </head>
@@ -263,23 +337,21 @@ export const buildResultsPageContent = (data) => {
 const rawNodes    = ${JSON.stringify(nodes)};
 const rawLinks    = ${JSON.stringify(validLinks)};
 const labelColors = ${JSON.stringify(labelColors)};
+let compareTitles = ${JSON.stringify(compareTitles)};
 
 const W = window.innerWidth;
 const H = window.innerHeight;
 
-// Card geometry used for link trimming — must stay in sync with whichever
-// size step is active (see sizeSteps below). Mutable so the size control
-// can update it.
-let CARD_HW = 106;   // half width + margin
-let CARD_HH = 36;    // half height + margin
-let cardOffX = 100;  // half card width, for centering the div on (x, y)
-let cardOffY = 28;   // half card height, for centering the div on (x, y)
+let CARD_HW = 106;
+let CARD_HH = 36;
+let cardOffX = 100;
+let cardOffY = 28;
 const ARROW_GAP = 7;
 
 const d3ok = typeof d3 !== "undefined";
 
 if (rawNodes.length > 0 && !d3ok) {
-  // CDN failed (offline?) — replace overlays with a clear error message.
+
   ["counts", "legend", "controls", "hint"].forEach(function (id) {
     const el = document.getElementById(id);
     if (el) el.remove();
@@ -307,7 +379,6 @@ if (rawNodes.length > 0 && d3ok) {
   const zoomG = svg.append("g");
   const cards = d3.select("#cards");
 
-  // Arrowhead marker.
   svg.append("defs").append("marker")
     .attr("id", "arrow")
     .attr("viewBox", "0 -5 10 10")
@@ -317,7 +388,7 @@ if (rawNodes.length > 0 && d3ok) {
     .attr("orient", "auto")
     .append("path")
     .attr("d", "M0,-5L10,0L0,5")
-    .attr("fill", "#c0c0c6");
+    .attr("fill", "${theme.arrow}");
 
   const zoom = d3.zoom()
     .scaleExtent([0.12, 3.5])
@@ -334,19 +405,22 @@ if (rawNodes.length > 0 && d3ok) {
     .data(rawLinks).enter()
     .append("line")
     .attr("class", "glink")
-    .attr("stroke", "#d0d0d5")
-    .attr("stroke-width", 1.4)
-    .attr("marker-end", "url(#arrow)");
+    .attr("stroke", function (d) { return d.weight ? "${theme.cmpLink}" : "${theme.linkStroke}"; })
+    .attr("stroke-width", function (d) {
+
+      return d.weight ? Math.min(7, 1.6 + d.weight * 0.33) : 1.4;
+    })
+    .attr("stroke-linecap", "round")
+    .attr("marker-end", function (d) { return d.undirected ? null : "url(#arrow)"; });
 
   const linkLabelEls = zoomG.selectAll(".link-label-text")
     .data(rawLinks).enter()
     .append("text")
-    .attr("class", "link-label-text")
+    .attr("class", function (d) { return "link-label-text" + (d.weight ? " cmp" : ""); })
     .attr("text-anchor", "middle")
     .attr("dy", -5)
     .text(function (d) { return d.type; });
 
-  // Click vs drag: a press that moves under 4px counts as a click.
   let moved = false, sx = 0, sy = 0;
   const dragBehavior = d3.drag()
     .on("start", function (event, d) {
@@ -378,6 +452,16 @@ if (rawNodes.length > 0 && d3ok) {
     window.parent.postMessage({ type: "NODE_DESELECT" }, "*");
   }
 
+  function nodeTitle(d) {
+    return String(d.properties.title || d.properties.name || "");
+  }
+
+  function refreshCompared() {
+    cardEls.classed("compared", function (d) {
+      return d.label === "Work" && compareTitles.indexOf(nodeTitle(d)) !== -1;
+    });
+  }
+
   const cardEls = cards.selectAll(".node-card")
     .data(rawNodes).enter()
     .append("div")
@@ -395,22 +479,25 @@ if (rawNodes.length > 0 && d3ok) {
     })
     .call(dragBehavior);
 
+  refreshCompared();
+
+  window.addEventListener("message", function (e) {
+    if (e.data && e.data.type === "COMPARE_SET" && Array.isArray(e.data.titles)) {
+      compareTitles = e.data.titles;
+      refreshCompared();
+    }
+  });
+
   const sim = d3.forceSimulation(rawNodes)
     .force("charge",  d3.forceManyBody().strength(charge))
     .force("link",    d3.forceLink(rawLinks).id(function (d) { return d.id; }).distance(linkDist))
     .force("collide", d3.forceCollide().radius(collide).strength(0.85))
     .force("center",  d3.forceCenter(W / 2, H / 2))
-    // Gentle per-node pull toward the middle. Without this, nodes with no
-    // (or few) relationships just get repelled outward by "charge" with
-    // nothing to pull them back, so they drift far from the cluster and
-    // the view has to zoom way out to fit them — this is what caused the
-    // "scattered all over, tiny nodes" look.
+
     .force("x", d3.forceX(W / 2).strength(0.03))
     .force("y", d3.forceY(H / 2).strength(0.03))
     .stop();
 
-  // Trim a link endpoint back to the border of the node card so
-  // arrowheads stay visible instead of hiding underneath the card.
   function edgeOffset(ux, uy) {
     const cx = ux === 0 ? Infinity : CARD_HW / Math.abs(ux);
     const cy = uy === 0 ? Infinity : CARD_HH / Math.abs(uy);
@@ -430,7 +517,7 @@ if (rawNodes.length > 0 && d3ok) {
       }
       const ux = dx / dist, uy = dy / dist;
       const startTrim = edgeOffset(ux, uy);
-      const endTrim   = edgeOffset(ux, uy) + ARROW_GAP;
+      const endTrim   = edgeOffset(ux, uy) + (d.undirected ? 0 : ARROW_GAP);
       if (startTrim + endTrim >= dist) {
         const mx = (sxp + txp) / 2, my = (syp + typ) / 2;
         el.attr("x1", mx).attr("y1", my).attr("x2", mx).attr("y2", my);
@@ -468,9 +555,6 @@ if (rawNodes.length > 0 && d3ok) {
     else container.call(zoom.transform, t);
   }
 
-  // Node-size steps: card width/padding/font plus matching link-trim and
-  // centering offsets. The "A+/A-" buttons cycle through these so every
-  // node on screen grows or shrinks together, in sync with its label text.
   const sizeSteps = [
     { w: 150, pad: "8px 11px 7px",   nameFs: "12px",   tagFs: "8.5px", tagPad: "2px 6px",  hw: 80,  hh: 26, offX: 75,  offY: 22 },
     { w: 200, pad: "12px 15px 10px", nameFs: "14.5px", tagFs: "10.5px",tagPad: "3px 8px",  hw: 106, hh: 34, offX: 100, offY: 28 },
@@ -479,7 +563,7 @@ if (rawNodes.length > 0 && d3ok) {
     { w: 360, pad: "21px 26px 19px", nameFs: "22px",   tagFs: "14.5px",tagPad: "5px 13px", hw: 186, hh: 58, offX: 180, offY: 46 },
     { w: 430, pad: "25px 30px 22px", nameFs: "26px",   tagFs: "16px",  tagPad: "5px 15px", hw: 221, hh: 68, offX: 215, offY: 54 },
   ];
-  let sizeIndex = 1; // matches the CSS defaults set on #cards above
+  let sizeIndex = 1;
 
   function applySize(idx) {
     idx = Math.max(0, Math.min(sizeSteps.length - 1, idx));
@@ -501,15 +585,13 @@ if (rawNodes.length > 0 && d3ok) {
     setTimeout(function () { sim.stop(); fitView(true); }, 380);
   }
 
-  // Settle the layout BEFORE first paint so nothing flies around on screen.
   const preTicks = Math.min(420, 140 + rawNodes.length * 5);
   for (let i = 0; i < preTicks; i++) sim.tick();
 
   renderPositions();
   fitView(false);
-  sim.on("tick", renderPositions); // keeps drag physics live afterwards
+  sim.on("tick", renderPositions);
 
-  // Legend.
   const legend = document.getElementById("legend");
   if (legend) {
     Object.keys(labelColors).forEach(function (label) {
@@ -526,13 +608,11 @@ if (rawNodes.length > 0 && d3ok) {
     });
   }
 
-  // Node-size controls.
   const sizeUp = document.getElementById("sizeUp");
   const sizeDown = document.getElementById("sizeDown");
   if (sizeUp)   sizeUp.addEventListener("click",   function () { applySize(sizeIndex + 1); });
   if (sizeDown) sizeDown.addEventListener("click", function () { applySize(sizeIndex - 1); });
 
-  // Zoom controls.
   const zin = document.getElementById("zin");
   const zout = document.getElementById("zout");
   const zfit = document.getElementById("zfit");
@@ -540,7 +620,6 @@ if (rawNodes.length > 0 && d3ok) {
   if (zout) zout.addEventListener("click", function () { container.transition().duration(200).call(zoom.scaleBy, 1 / 1.35); });
   if (zfit) zfit.addEventListener("click", function () { fitView(true); });
 
-  // Deselect on background click or Escape.
   document.getElementById("container").addEventListener("click", function (e) {
     if (e.target.id === "container" || e.target.id === "svg" || e.target.tagName === "svg") deselect();
   });
@@ -548,7 +627,6 @@ if (rawNodes.length > 0 && d3ok) {
     if (e.key === "Escape") deselect();
   });
 
-  // Fade the hint away.
   setTimeout(function () {
     const h = document.getElementById("hint");
     if (h) h.style.opacity = "0";
@@ -556,8 +634,7 @@ if (rawNodes.length > 0 && d3ok) {
 }
 </script>
 <script>
-// Reveal the (already settled) scene. Lives in its own script block so the
-// page still becomes visible even if the main graph script throws.
+
 requestAnimationFrame(function () { document.body.classList.add("ready"); });
 </script>
 </body>
