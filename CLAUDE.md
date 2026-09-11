@@ -115,10 +115,29 @@ Graph page layout: navbar (breadcrumbs, label switcher, connection pill) / left 
 - Complete UI redesign (dark navy theme, Syne + Space Mono fonts)
 - Phase 1: NL → Cypher via Groq (`/nl-query` endpoint + frontend ASK input)
 
+**v4 — keyword features (Bayaaz-e-Hayaat literary archive):**
+
+Keywords live as an array property on `Work` nodes (`keywords` English, `keywordsUrdu` Urdu, positionally aligned). They are deliberately *not* modelled as nodes — 86% of curated keywords appear on only one work, so promoting them would produce a hairball.
+
+The right panel is tabbed: **Inspect** (the original node detail + NL query), **Keywords**, **Compare**.
+
+- *Find a keyword → its works*: keyword chips in the Inspect tab and the searchable browse list in the Keywords tab both call `openKeyword()`, which runs `worksWithKeywordQuery()`. That query pulls each work **plus its author via `OPTIONAL MATCH (a:Author)-[r:WROTE]->(w)`** — without the author the result is unlinked nodes and D3 renders a scatter instead of a graph.
+- *Compare works → shared keywords*: "+ Add to comparison" stores `{title, author, keywords}` in `sessionStorage["neoviz_compare"]`. The intersection is computed client-side from properties already in hand, so no extra round-trip. Splits results into "In all N" and "In some".
+- *Normalisation*: `normKey()` in `CypherQueryTester.js` mirrors `canon.py` in the import pipeline — NFKC, curly→straight quotes, en/em dash→hyphen, whitespace collapse, strip edge punctuation (including Urdu `،` `۔`), lowercase. **Change both together or search silently breaks.** Cypher matching also uses `toLower(trim(k))` as a second line of defence.
+
+Data pipeline lives in `data/`: `Bayaaz-e-Hayaat Metadata_Keywords.xlsx` (Nazia's sheet, the source of truth) → `import_keywords_sept.cypher` (generated). `backup_keywords_before_sept_import.json` is the rollback snapshot of keyword state prior to the September import.
+
+**v4 additions (September 2026):**
+- **Dark mode**: `src/theme.js` stamps `data-theme` on `<html>`; every CSS file has a `:root[data-theme="dark"]` token override block plus scoped fixes for hardcoded colors. The iframe gets its theme via `buildResultsPageContent(data, { theme })` — theme switches re-render the last result set from `lastRecordsRef`. Toggle lives in the graph navbar; persisted in `localStorage["neoviz_theme"]`.
+- **Compare redesign**: with the Compare tab active, clicking a Work in the graph toggles it in/out of the comparison (amber ring + ✓ badge, updated live via `COMPARE_SET` postMessage — no rebuild). Non-Work nodes are ignored in this mode. "Show only selected" renders a synthetic client-side graph: selected works joined by undirected links labeled "N shared", thickness ∝ shared-keyword count (`weight`/`undirected` fields on link entries).
+- **Node search** (navbar): debounced CONTAINS search over `name`/`title` across all labels; picking a result runs a jump query (node + its neighborhood). Root query now has `ORDER BY toLower(coalesce(n.name, n.title))` so the default sample is deterministic — this fixed the "Sughra Humayun Mirza missing from default view" issue.
+- **Phase 2+3 (done)**: `/explain` endpoint — after each NL query the frontend sends a compact node/relationship summary; the model returns 2–4 sentences with entity names wrapped in `[[ ]]`, rendered as clickable buttons that fire jump queries.
+- **Groq model**: `llama-3.3-70b-versatile` was REMOVED from free-tier keys (Sept 2026, "enterprise pricing" only) — both endpoints now use `openai/gpt-oss-120b`. `/nl-query` also injects the live schema (`db.labels()`, `db.relationshipTypes()`, `db.propertyKeys()`, run sequentially — one session can't run parallel queries) into the system prompt so the model can't hallucinate relationship types; includes explicit guidance that keywords are array properties, not Keyword nodes.
+- **404 page**: `NotFound.js` on the `*` route, theme-aware.
+- Keyword display is first-letter-capitalised via `displayKw()` — display only, matching still uses `normKey`.
+
 **Still needed:**
-- `ConfigurationView.js` hasn't been redesigned to dark theme yet — "SELECT A NODE TO EXPLORE" heading needs adding
-- **Phase 2:** Split-screen layout — D3 graph on left, LLM-generated plain-English explanation of results on right (new Groq call after each query)
-- **Phase 3:** Entity highlighting in Phase 2 explanation — clickable terms that fire new graph queries centered on that entity (LLM should tag entities in its response)
+- `Mundadugu` exists twice in the DB with conflicting years (1945 vs 1980) and two variant author nodes ("Sunkara and Vasireddi" vs "Sunkara Satyanarayana and V. Bhaskara Rao") — needs a human decision, likely Nazia's team
 - Replace remaining `alert()` popups in `Configuration.js` with inline error UI
 - `/sendContribution` endpoint is an empty stub
 
