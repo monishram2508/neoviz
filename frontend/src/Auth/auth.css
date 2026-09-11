@@ -36,7 +36,6 @@ html, body { height: 100%; }
   -webkit-font-smoothing: antialiased;
 }
 
-/* ───────────────── LEFT / BRAND PANEL ───────────────── */
 .auth-left {
   width: 46%;
   min-width: 420px;
@@ -50,7 +49,6 @@ html, body { height: 100%; }
   overflow: hidden;
 }
 
-/* subtle dot grid */
 .auth-left::before {
   content: '';
   position: absolute;
@@ -134,7 +132,6 @@ html, body { height: 100%; }
   flex-shrink: 0;
 }
 
-/* ───────────────── RIGHT / FORM PANEL ───────────────── */
 .auth-right {
   flex: 1;
   display: flex;
@@ -297,7 +294,6 @@ html, body { height: 100%; }
 
 .auth-switch span:hover { color: var(--accent-hover); text-decoration: underline; }
 
-/* ───────────────── ANIMATIONS ───────────────── */
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -310,3 +306,26 @@ html, body { height: 100%; }
   .auth-right { padding: 1.5rem; }
   .auth-card { padding: 2rem 1.5rem; }
 }
+
+:root[data-theme="dark"] {
+  --bg: #101012;
+  --surface: #1c1c21;
+  --surface-2: #26262c;
+  --border: #33333a;
+  --border-strong: #45454d;
+  --text-1: #f4f4f5;
+  --text-2: #a1a1aa;
+  --text-3: #71717a;
+  --accent: #818cf8;
+  --accent-hover: #a5b4fc;
+  --accent-soft: rgba(99, 102, 241, 0.16);
+  --accent-ring: rgba(129, 140, 248, 0.22);
+  --green: #4ade80;
+  --danger: #f87171;
+  --danger-soft: rgba(248, 113, 113, 0.1);
+  --danger-border: rgba(248, 113, 113, 0.3);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 1px 3px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+:root[data-theme="dark"] .auth-left::before { background-image: radial-gradient(circle, #26262c 1px, transparent 1px); }
+:root[data-theme="dark"] .auth-input:hover { border-color: #52525b; }
