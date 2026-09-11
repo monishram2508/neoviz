@@ -18,7 +18,7 @@ export default function Login() {
       const res = await fetch("http://localhost:3001/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password })
       });
       const data = await res.json();
       if (data.token) {
@@ -37,7 +37,6 @@ export default function Login() {
   return (
     <div className="auth-root">
 
-      {/* BRAND PANEL */}
       <div className="auth-left">
         <div className="auth-left-inner">
           <div className="auth-brand">
@@ -72,7 +71,6 @@ export default function Login() {
         </div>
       </div>
 
-      {/* FORM PANEL */}
       <div className="auth-right">
         <div className="auth-card">
           <p className="auth-card-label">Sign in</p>
@@ -90,8 +88,8 @@ export default function Login() {
               value={email}
               autoFocus
               onChange={(e) => setEmail(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-            />
+              onKeyDown={(e) => e.key === "Enter" && handleLogin()} />
+            
           </div>
 
           <div className="auth-field">
@@ -104,13 +102,13 @@ export default function Login() {
                 placeholder="••••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-              />
+                onKeyDown={(e) => e.key === "Enter" && handleLogin()} />
+              
               <button
                 type="button"
                 className="auth-eye"
-                onClick={() => setShowPassword((s) => !s)}
-              >
+                onClick={() => setShowPassword((s) => !s)}>
+                
                 {showPassword ? "Hide" : "Show"}
               </button>
             </div>
@@ -127,6 +125,6 @@ export default function Login() {
           </p>
         </div>
       </div>
-    </div>
-  );
+    </div>);
+
 }

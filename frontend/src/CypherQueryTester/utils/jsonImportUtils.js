@@ -1,4 +1,4 @@
-// Validates the imported JSON structure for Neo4j node and relationship insertion.
+
 export const validateJson = (obj) => {
   if (!obj || typeof obj !== "object") {
     throw new Error("JSON must be an object");
@@ -38,7 +38,6 @@ export const validateJson = (obj) => {
   });
 };
 
-// Converts a JavaScript object into a Cypher map literal string.
 export const toCypherMap = (obj) => {
   if (!obj || Object.keys(obj).length === 0) return "{}";
   const pairs = Object.entries(obj).map(([k, v]) => {
@@ -48,7 +47,6 @@ export const toCypherMap = (obj) => {
   return `{${pairs.join(", ")}}`;
 };
 
-// Generates a Cypher script that merges nodes first and then their relationships.
 export const generateCypher = (parsed) => {
   if (!parsed) return "";
 

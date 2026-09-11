@@ -26,7 +26,7 @@ export default function Register() {
       const res = await fetch("http://localhost:3001/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password })
       });
       const data = await res.json();
       if (data.success) {
@@ -44,7 +44,6 @@ export default function Register() {
   return (
     <div className="auth-root">
 
-      {/* BRAND PANEL */}
       <div className="auth-left">
         <div className="auth-left-inner">
           <div className="auth-brand">
@@ -79,7 +78,6 @@ export default function Register() {
         </div>
       </div>
 
-      {/* FORM PANEL */}
       <div className="auth-right">
         <div className="auth-card">
           <p className="auth-card-label">Create account</p>
@@ -97,8 +95,8 @@ export default function Register() {
               value={email}
               autoFocus
               onChange={(e) => setEmail(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleRegister()}
-            />
+              onKeyDown={(e) => e.key === "Enter" && handleRegister()} />
+            
           </div>
 
           <div className="auth-field">
@@ -111,13 +109,13 @@ export default function Register() {
                 placeholder="At least 6 characters"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleRegister()}
-              />
+                onKeyDown={(e) => e.key === "Enter" && handleRegister()} />
+              
               <button
                 type="button"
                 className="auth-eye"
-                onClick={() => setShowPassword((s) => !s)}
-              >
+                onClick={() => setShowPassword((s) => !s)}>
+                
                 {showPassword ? "Hide" : "Show"}
               </button>
             </div>
@@ -134,6 +132,6 @@ export default function Register() {
           </p>
         </div>
       </div>
-    </div>
-  );
+    </div>);
+
 }

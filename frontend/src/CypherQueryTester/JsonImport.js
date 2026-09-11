@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import "./JsonImport.css";
 import { generateCypher, validateJson } from "./utils/jsonImportUtils";
 
-// Handles JSON upload, validation, and insertion into Neo4j.
 export default function JsonImportPage() {
   const navigate = useNavigate();
 
@@ -13,7 +12,6 @@ export default function JsonImportPage() {
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Reads a JSON file from disk and validates the parsed graph payload.
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -35,7 +33,6 @@ export default function JsonImportPage() {
     reader.readAsText(file);
   };
 
-  // Validates JSON while the user edits raw input text.
   const handleJsonEdit = (value) => {
     setRawJson(value);
     try {
@@ -49,7 +46,6 @@ export default function JsonImportPage() {
     }
   };
 
-  // Sends the generated Cypher script to backend for Neo4j insertion.
   const pushToNeo4j = async () => {
     if (!parsed) return;
 
@@ -57,11 +53,11 @@ export default function JsonImportPage() {
     setStatus("");
     try {
       const uri =
-        sessionStorage.getItem("neo4j_uri") || localStorage.getItem("neo4j_uri");
+      sessionStorage.getItem("neo4j_uri") || localStorage.getItem("neo4j_uri");
       const username =
-        sessionStorage.getItem("neo4j_username") || localStorage.getItem("neo4j_username");
+      sessionStorage.getItem("neo4j_username") || localStorage.getItem("neo4j_username");
       const password =
-        sessionStorage.getItem("neo4j_password") || localStorage.getItem("neo4j_password");
+      sessionStorage.getItem("neo4j_password") || localStorage.getItem("neo4j_password");
       const token = localStorage.getItem("token");
 
       if (!uri || !username || !password) {
@@ -75,14 +71,14 @@ export default function JsonImportPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
         },
         body: JSON.stringify({
           cypher,
           uri,
           username,
-          password,
-        }),
+          password
+        })
       });
 
       if (!res.ok) {
@@ -115,16 +111,16 @@ export default function JsonImportPage() {
         className="json-preview"
         placeholder="JSON preview / edit area"
         value={rawJson}
-        onChange={(e) => handleJsonEdit(e.target.value)}
-      />
+        onChange={(e) => handleJsonEdit(e.target.value)} />
+      
 
       {error && <div className="error-box">{error}</div>}
 
       <div className="button-row">
         <button
           disabled={!parsed || !!error || loading}
-          onClick={pushToNeo4j}
-        >
+          onClick={pushToNeo4j}>
+          
           {loading ? "Inserting..." : "Confirm & Insert"}
         </button>
 
@@ -134,6 +130,6 @@ export default function JsonImportPage() {
       </div>
 
       {status && <div className="status-box">{status}</div>}
-    </div>
-  );
+    </div>);
+
 }
