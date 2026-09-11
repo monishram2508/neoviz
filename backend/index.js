@@ -207,9 +207,24 @@ app.post("/nl-query", authMiddleware, async (req, res) => {
       messages: [
         {
           role: "system",
-          content: `You are a Neo4j Cypher expert. 
+          content: `You are a Neo4j Cypher expert.
           The user is exploring a graph database with node label: ${nodeLabel}.
           Convert the user's question into a valid Cypher query.
+
+          CRITICAL: the query result is rendered as a visual graph, so it must
+          return actual nodes and relationships — never return only a count,
+          aggregate, or other scalar value on its own. If the question involves
+          a threshold or count (e.g. "nodes with at least N connections"),
+          first compute which nodes qualify using a WITH clause, then MATCH
+          again from those qualifying nodes to return the real connected nodes
+          and relationships. For example, for "magazines with 3 or more
+          connections to Work nodes":
+            MATCH (m:Magazine)-[r]-(w:Work)
+            WITH m, count(w) AS workCount
+            WHERE workCount >= 3
+            MATCH (m)-[r2]-(w2:Work)
+            RETURN m, r2, w2 LIMIT 50
+
           Return ONLY the Cypher query, no explanation, no markdown, no backticks.
           Always include a LIMIT 50 at the end unless the user specifies otherwise.`
         },

@@ -32,11 +32,12 @@ GROQ_API_KEY=your_groq_key_here
 
 ## Neo4j Instance
 
-Credentials are in `Neo4j-5ac48bc9-Created-2026-05-22.txt` (project root, one level up from `neo/`):
-- URI: `neo4j+s://5ac48bc9.databases.neo4j.io`
-- Username: `5ac48bc9` (not "neo4j" — the AuraDB username matches the instance ID)
-- Password: in the `.txt` file
-- **AuraDB Free pauses after 3 days of inactivity** — resume at https://console.neo4j.io before connecting
+The user's own AuraDB instance (created July 2026, populated from `neo4j_dump_fixed.cypher`):
+- URI: `neo4j+s://98adb721.databases.neo4j.io`
+- Username: `98adb721` (AuraDB usernames match the instance ID, not "neo4j")
+- Password: saved in the app's SQLite `connections` table (`backend/users.db`)
+- **AuraDB Free pauses after 3 days of inactivity** — resume at https://console.neo4j.io before connecting. While resuming, DNS for the hostname doesn't resolve (`ENOTFOUND`) — that's normal for 1–3 minutes.
+- Data: 268 nodes of literary works (South Asian women authors — Urdu/Telugu) with bios, languages, relationships.
 
 ## Architecture
 
@@ -88,20 +89,24 @@ All routes require JWT except `/register` and `/login`.
 | `/me` | GET | Current user info |
 | `/sendContribution` | POST | Empty stub — not implemented |
 
-## Design System
+## Design System (v3 — light neutral)
 
 All CSS files share a consistent token set defined in `:root` blocks across `auth.css`, `CypherQueryTester.css`, and `configuration.css`. Key tokens:
 
 ```css
---bg-base:    #010D1C;   /* deep navy page background */
---accent:     #00d4ff;   /* cyan — buttons, glows, highlights */
---success:    #00e5a0;   /* green — connection status */
---danger:     #f87171;   /* red — errors */
---font-display: 'Syne', sans-serif;
---font-mono:    'Space Mono', monospace;
+--bg: #fafafa;        /* page background */
+--surface: #ffffff;   /* cards, navbar, panel */
+--border: #e4e4e7;    /* hairline borders */
+--text-1: #18181b;    /* primary text (zinc-900) */
+--accent: #4f46e5;    /* indigo — primary buttons, focus rings */
+--green: #16a34a;     /* connection status */
+--danger: #dc2626;    /* errors */
+--font: 'Inter';  --font-mono: 'JetBrains Mono';
 ```
 
-To change the accent color, update `--accent`, `--accent-dim`, and `--accent-border` in all three CSS files, or consolidate into a single `theme.css` (not done yet).
+Node label colors come from a deterministic hash palette duplicated in `buildResultsPageContent.js`, `ConfigurationView.js`, and `CypherQueryTester.js` (PALETTE) — a label gets the same color everywhere. Change all three together.
+
+Graph page layout: navbar (breadcrumbs, label switcher, connection pill) / left graph iframe / right 320px collapsible panel (node inspector + NL query). The collapse toggle tab lives in `.graph-body`, *outside* the panel, so it's never clipped when collapsed.
 
 ## What's Done vs. Still Needed
 
@@ -122,5 +127,7 @@ To change the accent color, update `--accent`, `--accent-dim`, and `--accent-bor
 - **Credentials file mismatch:** The handoff doc says Neo4j username is `"neo4j"` but the actual AuraDB credentials file shows username = `"5ac48bc9"` (matches the instance ID). Use the `.txt` file as truth.
 - **Neo4j driver per request:** Each `/query` and `/nl-query` call creates and closes a new `neo4j.driver` instance. This works but is not connection-pooled.
 - **D3 in iframe:** The graph lives inside an `<iframe srcDoc={...}>`. To pass data between the iframe and React, use `window.postMessage` (already wired for limit updates).
-- **Groq model:** `llama3-70b-8192` — if this model is deprecated, update the model string in `/nl-query` in `backend/index.js`.
+- **Groq model:** `llama-3.3-70b-versatile` (the original `llama3-70b-8192` was decommissioned July 2026). If deprecated again, check https://console.groq.com/docs/models and update the string in `/nl-query` in `backend/index.js`.
+- **Graph iframe contract:** iframe → parent messages: `NODE_CLICK {node}`, `NODE_DESELECT`. The graph pre-settles its force simulation (sim.stop() + manual ticks) before first paint, then fades in — don't reintroduce live-settling on load, it looks chaotic.
+- **Root query pattern:** `MATCH (n:\`Label\`) WITH n LIMIT 15 OPTIONAL MATCH (n)-[r]-(m) RETURN n, r, m` — the OPTIONAL MATCH is what makes relationships appear on the initial view.
 - **Database files from original student:** Gadha (prior BTP student) provided a JSON file and a `.cypher` file with literary work data to populate a fresh Neo4j instance. These files were not in this directory — ask the user where they are if needed for database setup.

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import ConfigurationView, { ConfigurationLoadingView } from "./components/ConfigurationView";
+import ConfigurationView from "./components/ConfigurationView";
 import {
   fetchConnectionLabels,
   fetchSavedConnections,
@@ -44,14 +44,23 @@ const ConfigurationPage = () => {
   }, []);
 
   useEffect(() => {
-    fetchSavedConnections().then(setConnections);
+    fetchSavedConnections().then((rows) => {
+      setConnections(Array.isArray(rows) ? rows : []);
+    }).catch(() => {});
   }, []);
+
+  const storeLabels = (labels) => {
+    sessionStorage.setItem("neo4j_labels", JSON.stringify(labels));
+  };
 
   const fetchLabelsWithCredentials = async (u, n, p) => {
     setNodesLoading(true);
     try {
       const { response, data } = await fetchConnectionLabels({ uri: u, username: n, password: p });
-      if (response.ok) setNodes(data.labels.map((label) => ({ label })));
+      if (response.ok) {
+        setNodes(data.labels.map((label) => ({ label })));
+        storeLabels(data.labels);
+      }
     } catch (err) {
       console.error("Error fetching labels:", err);
     } finally {
@@ -61,11 +70,16 @@ const ConfigurationPage = () => {
 
   const connectToNeo4j = async () => {
     setError("");
+    if (!uri.trim() || !username.trim() || !password) {
+      setError("Please fill in the URI, username and password.");
+      return;
+    }
     setLoading(true);
     try {
       const { response, data } = await fetchConnectionLabels({ uri, username, password });
       if (response.ok) {
         setNodes(data.labels.map((label) => ({ label })));
+        storeLabels(data.labels);
         setConnected(true);
 
         sessionStorage.setItem("neo4j_uri",      uri);
@@ -74,20 +88,21 @@ const ConfigurationPage = () => {
 
         if (!connections.some((c) => c.uri === uri && c.username === username)) {
           await saveConnectionRecord({ uri, username, password, name: connectionName.trim() || uri });
-          setConnections(await fetchSavedConnections());
+          const rows = await fetchSavedConnections();
+          setConnections(Array.isArray(rows) ? rows : []);
         }
       } else {
-        setError(data.error || "Failed to connect.");
+        setError(data.error || "Failed to connect. Check your credentials.");
       }
     } catch {
-      setError("Failed to connect. Check your backend is running.");
+      setError("Failed to connect. Make sure the backend is running.");
     } finally {
       setLoading(false);
     }
   };
 
   const handleSavedConnectionSelect = (connectionId) => {
-    const selected = connections.find((c) => c.id == connectionId);
+    const selected = connections.find((c) => String(c.id) === String(connectionId));
     if (!selected) return;
     setUri(selected.uri);
     setUsername(selected.username);
@@ -109,15 +124,17 @@ const ConfigurationPage = () => {
     });
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    sessionStorage.removeItem("neo4j_uri");
-    sessionStorage.removeItem("neo4j_username");
-    sessionStorage.removeItem("neo4j_password");
-    window.location.href = "/login";
+  const handleSwitchDb = () => {
+    setConnected(false);
+    setError("");
+    setNodes([]);
   };
 
-  if (loading) return <ConfigurationLoadingView />;
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    sessionStorage.clear();
+    window.location.href = "/login";
+  };
 
   return (
     <ConfigurationView
@@ -141,6 +158,7 @@ const ConfigurationPage = () => {
       nodes={nodes}
       onNodeClick={handleNodeClick}
       nodesLoading={nodesLoading}
+      onSwitchDb={handleSwitchDb}
     />
   );
 };
