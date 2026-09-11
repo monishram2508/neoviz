@@ -299,6 +299,46 @@ app.post("/nl-query", authMiddleware, async (req, res) => {
   }
 });
 
+app.post("/explain", authMiddleware, async (req, res) => {
+  const { question, cypher, summary } = req.body;
+  if (!summary) return res.status(400).json({ error: "Missing result summary" });
+
+  try {
+    const Groq = require("groq-sdk");
+    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
+    const chatResponse = await groq.chat.completions.create({
+      model: "openai/gpt-oss-120b",
+      messages: [
+      {
+        role: "system",
+        content: `You explain graph-database query results to non-technical users.
+          You will receive the user's original question, the Cypher that ran, and a
+          summary of the nodes and relationships that came back.
+
+          Write 2-4 plain-English sentences describing what the result shows —
+          patterns, counts, notable connections. No jargon, no Cypher talk.
+
+          CRITICAL: every time you mention an entity by name, and that exact name
+          appears in the node list you were given, wrap it in double square
+          brackets, e.g. [[Jeelani Bano]] or [[Aiwan-e-Ghazal]]. Use the name
+          EXACTLY as it appears in the list. Do not wrap anything that is not in
+          the node list. Do not use any other formatting.`
+      },
+      {
+        role: "user",
+        content: `Question: ${question || "(direct query)"}\nCypher: ${cypher || "(n/a)"}\n\nResult summary:\n${summary}`
+      }]
+
+    });
+
+    res.json({ explanation: chatResponse.choices[0].message.content.trim() });
+  } catch (err) {
+    console.error("Groq explain error:", err);
+    res.status(500).json({ error: "Failed to generate explanation" });
+  }
+});
+
 app.post("/sendContribution", authMiddleware, (req, res) => {
 });
 
