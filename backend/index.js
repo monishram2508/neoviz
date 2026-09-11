@@ -39,7 +39,7 @@ app.post("/connect", authMiddleware, async (req, res) => {
   }
   if (!/^neo4j(\+s|\+ssc)?:\/\//.test(uri) && !/^bolt(\+s|\+ssc)?:\/\//.test(uri)) {
     return res.status(400).json({
-      error: "Invalid Neo4j URI scheme. Use neo4j:// or neo4j+s://",
+      error: "Invalid Neo4j URI scheme. Use neo4j:// or neo4j+s://"
     });
   }
 
@@ -87,7 +87,7 @@ app.post("/query", authMiddleware, async (req, res) => {
   }
   if (!/^neo4j(\+s|\+ssc)?:\/\//.test(uri) && !/^bolt(\+s|\+ssc)?:\/\//.test(uri)) {
     return res.status(400).json({
-      error: "Invalid Neo4j URI scheme. Use neo4j:// or neo4j+s://",
+      error: "Invalid Neo4j URI scheme. Use neo4j:// or neo4j+s://"
     });
   }
 
@@ -122,7 +122,7 @@ app.post("/register", async (req, res) => {
   db.run(
     "INSERT INTO users (email, password) VALUES (?, ?)",
     [email, hashed],
-    function(err) {
+    function (err) {
       if (err) {
         return res.status(400).json({ error: "User already exists" });
       }
@@ -181,7 +181,7 @@ app.post("/save-connection", authMiddleware, (req, res) => {
     `INSERT INTO connections (user_id, uri, username, password, name)
      VALUES (?, ?, ?, ?, ?)`,
     [req.user.id, uri, username, password, name || uri],
-    function(err) {
+    function (err) {
       if (err) {
         console.error(err);
         return res.status(500).json({ error: "Failed to save connection" });
@@ -202,14 +202,46 @@ app.post("/nl-query", authMiddleware, async (req, res) => {
     const Groq = require("groq-sdk");
     const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
+    let schemaNote = "";
+    if (/^neo4j(\+s|\+ssc)?:\/\//.test(uri) || /^bolt(\+s|\+ssc)?:\/\//.test(uri)) {
+      const sDriver = neo4j.driver(uri, neo4j.auth.basic(username, password));
+      const sSession = sDriver.session();
+      try {
+
+        const lbl = await sSession.run("CALL db.labels()");
+        const rel = await sSession.run("CALL db.relationshipTypes()");
+        const keys = await sSession.run("CALL db.propertyKeys()");
+        schemaNote = `
+          THIS DATABASE'S ACTUAL SCHEMA — use ONLY these:
+          Node labels: ${lbl.records.map((r) => r.get(0)).join(", ")}
+          Relationship types: ${rel.records.map((r) => r.get(0)).join(", ")}
+          Property keys: ${keys.records.map((r) => r.get(0)).join(", ")}
+
+          Never invent labels or relationship types not listed above.
+          "keywords" and "keywordsUrdu" are STRING ARRAY properties on Work
+          nodes (there is no Keyword node or HAS_KEYWORD relationship).
+          To match by keyword use:
+            any(k IN w.keywords WHERE toLower(k) = toLower("term"))
+          To find works sharing keywords with a given work, intersect the
+          arrays:
+            MATCH (t:Work {title: "X"})
+            MATCH (w:Work) WHERE w <> t
+              AND any(k IN w.keywords WHERE k IN t.keywords)
+            OPTIONAL MATCH (a:Author)-[r:WROTE]->(w)
+            RETURN w, r, a LIMIT 50`;
+      } catch {} finally
+      {await sSession.close();await sDriver.close();}
+    }
+
     const chatResponse = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+      model: "openai/gpt-oss-120b",
       messages: [
-        {
-          role: "system",
-          content: `You are a Neo4j Cypher expert.
+      {
+        role: "system",
+        content: `You are a Neo4j Cypher expert.
           The user is exploring a graph database with node label: ${nodeLabel}.
           Convert the user's question into a valid Cypher query.
+          ${schemaNote}
 
           CRITICAL: the query result is rendered as a visual graph, so it must
           return actual nodes and relationships — never return only a count,
@@ -227,12 +259,12 @@ app.post("/nl-query", authMiddleware, async (req, res) => {
 
           Return ONLY the Cypher query, no explanation, no markdown, no backticks.
           Always include a LIMIT 50 at the end unless the user specifies otherwise.`
-        },
-        {
-          role: "user",
-          content: question
-        }
-      ]
+      },
+      {
+        role: "user",
+        content: question
+      }]
+
     });
 
     const cypher = chatResponse.choices[0].message.content.trim();
