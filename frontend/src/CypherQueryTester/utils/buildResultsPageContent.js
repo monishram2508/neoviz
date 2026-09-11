@@ -1,972 +1,257 @@
-// Builds graph visualization HTML content for rendering in an iframe.
-export const buildResultsPageContent = (data, options = {}) => {
-    const { allowSelection = false } = options;
-    const scaleFactor = allowSelection ? 0.6 : 1.0;
+const PALETTE = [
+  { bg: "#e0f2fe", border: "#38bdf8", text: "#0369a1" },
+  { bg: "#dcfce7", border: "#4ade80", text: "#15803d" },
+  { bg: "#fef9c3", border: "#facc15", text: "#854d0e" },
+  { bg: "#f3e8ff", border: "#c084fc", text: "#7e22ce" },
+  { bg: "#ffe4e6", border: "#fb7185", text: "#9f1239" },
+  { bg: "#ffedd5", border: "#fb923c", text: "#c2410c" },
+];
 
-    // Generates a pastel-like color used to visually group node labels.
-    const getRandomColor = () => {
-      const h = Math.floor(Math.random() * 360);
-      const s = Math.floor(50 + Math.random() * 30);
-      const l = Math.floor(65 + Math.random() * 20);
-      return `hsl(${h}, ${s}%, ${l}%)`;
-    };
-
-    const nodes = [];
-    const links = [];
-    const nodeTypeColors = {};
-
-if (!Array.isArray(data)) {
-  console.error("Invalid data:", data);
-  return;
+function getLabelColor(label) {
+  let hash = 0;
+  for (let i = 0; i < label.length; i++) hash = label.charCodeAt(i) + ((hash << 5) - hash);
+  return PALETTE[Math.abs(hash) % PALETTE.length];
 }
 
-data.forEach((item) => {
-      Object.values(item).forEach((entry) => {
-        if (entry.startNodeElementId && entry.endNodeElementId && entry.type) {
-          links.push({
-            id: entry.elementId,
-            source: entry.startNodeElementId,
-            target: entry.endNodeElementId,
-            type: entry.type,
-          });
-        } else if (entry.elementId && entry.labels && entry.properties) {
-          const nodeLabel = entry.labels[0];
-          if (!nodeTypeColors[nodeLabel]) {
-            nodeTypeColors[nodeLabel] = getRandomColor();
-          }
+export const buildResultsPageContent = (data) => {
+  const nodes = [];
+  const links = [];
+  const seen  = new Set();
+
+  if (!Array.isArray(data)) return "";
+
+  data.forEach((item) => {
+    Object.values(item).forEach((entry) => {
+      if (!entry || typeof entry !== "object") return;
+      if (entry.startNodeElementId && entry.endNodeElementId && entry.type) {
+        links.push({
+          id:     entry.elementId,
+          source: entry.startNodeElementId,
+          target: entry.endNodeElementId,
+          type:   entry.type,
+        });
+      } else if (entry.elementId && entry.labels && entry.properties) {
+        if (!seen.has(entry.elementId)) {
+          seen.add(entry.elementId);
           nodes.push({
-            id: entry.elementId,
-            label: entry.labels[0],
+            id:         entry.elementId,
+            label:      entry.labels[0] || "Node",
             properties: entry.properties,
-            color: nodeTypeColors[nodeLabel],
           });
-        }
-      });
-    });
-    const uniqueNodes = Array.from(
-      new Map(nodes.map((node) => [node.id, node])).values()
-    );
-
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <style>
-          body {
-            font-family: Arial, sans-serif;
-            padding: 20px;
-            background-color: #f9f9f9;
-            overflow: auto;
-            margin: 0;
-          }
-
-          h1 {
-            text-align: center;
-            
-          }
-        #graph-container {
-  width: ${allowSelection ? "300vw" : "2000px"};
-  height: ${allowSelection ? "300vh" : "2000px"};
-  margin-top: 20px;
-  overflow: auto;
-  position: relative;
-}
-
-#graph-wrapper, #subgraph-wrapper {
-  transition: transform 0.2s ease-out;
-}
-
-
-          text {
-            font-size: 12px;
-          }
-
-
-          .node-details {
-            display: none;
-            margin-top: 15px;
-            
-            font-size: 14px;
-            color: #444;
-            line-height: 1.6;
-            background: #f9f9f9;
-            border-radius: 8px;
-            padding: 10px;
-            box-shadow: 0px 2px 6px rgba(0, 0, 0, 0.1);
-            max-height: 100px; /* Limit height for details */
-            overflow-y: auto; /* Scrollable details */
-          }
-
-          .node-card h3 {
-            margin: 0;
-            font-size: 16px;
-            font-weight: bold;
-            color: #333;
-          }
-
-          .node-card p {
-            margin: 0;
-            font-size: 14px;
-            color: #666;
-          }
-
-          .node-details p {
-            margin: 5px 0;
-            font-size: 12px;
-            color: #444;
-          }
-          .link-label {
-            font-size: 14px;
-            font-weight: bold;
-            fill: #333;
-          }
-          .selected {
-            outline: 4px solid #ff9800;
-            z-index: 999;
-          }
-
-          body::-webkit-scrollbar {
-            width: 10px;
-            height: 10px;
-          }
-          body::-webkit-scrollbar-thumb {
-            background-color: #ccc;
-            border-radius: 10px;
-          }
-
-
-        </style>
-        <script src="https://d3js.org/d3.v6.min.js"></script>
-      </head>
-      <body>
-    
-
-        <div id="instruction-text" style="position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.8); color: white; padding: 8px 12px;
-            border-radius: 5px; font-size: 14px;">
-            Drag the nodes to move them around!
-        </div>
-          ${allowSelection ? `
-          <div id="toolbar" style="
-            position:absolute;
-            top:10px;
-            right:10px;
-            background:rgba(255,255,255,0.9);
-            padding:8px;
-            border-radius:8px;
-            box-shadow:0 2px 6px rgba(0,0,0,0.15);
-            display:flex;
-            gap:8px;
-            z-index:1000;">
-            <button id="showSelectedBtn" style="padding:6px 10px;cursor:pointer;">Show Selected Subgraph</button>
-            <button id="clearSelectionBtn" style="padding:6px 10px;cursor:pointer;">Clear Selection</button>
-          </div>
-          ` : `
-          <div id="limit-control" style="
-          position: absolute;
-          top: 15px;
-          right: 15px;
-          background: #ffffffcc;
-          backdrop-filter: blur(6px);
-          border: 1px solid #ddd;
-          border-radius: 12px;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-          padding: 10px 14px;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          font-family: 'Inter', Arial, sans-serif;
-          z-index: 1000;
-        ">
-          <label for="limitInput" style="
-            font-size: 14px;
-            font-weight: 600;
-            color: #333;
-          ">
-            Limit:
-          </label>
-
-          <input id="limitInput" type="number" value="10" min="1" max="500" style="
-            width: 80px;
-            padding: 6px 8px;
-            font-size: 14px;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            outline: none;
-            transition: border-color 0.2s ease;
-          " onfocus="this.style.borderColor='#007bff'" onblur="this.style.borderColor='#ccc'">
-
-          <button id="updateLimitBtn" style="
-            background: #007bff;
-            color: #fff;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 8px;
-            font-size: 14px;
-            cursor: pointer;
-            font-weight: 500;
-            transition: all 0.25s ease;
-          " onmouseover="this.style.background='#0056b3'" onmouseout="this.style.background='#007bff'">
-            Update
-          </button>
-        </div>
-
-          `}
-
-        <div id="graph-container"></div>
-        <script>
-          const nodes = ${JSON.stringify(uniqueNodes)};
-          const links = ${JSON.stringify(links)};
-
-          setTimeout(() => {
-                  d3.select("#instruction-text")
-                    .transition()
-                    .duration(2000)  
-                    .style("opacity", 0.2); 
-                }, 4000);
-
-          // Keep layout dynamic based on graph density instead of fixed force values.
-          const width = ${allowSelection ? "window.innerWidth * 3" : "window.innerWidth * 0.9"};
-          const height = ${allowSelection ? "window.innerHeight * 3" : "window.innerHeight * 0.9"};
-          const nodeCount = Math.max(nodes.length, 1);
-          const areaPerNode = (width * height) / nodeCount;
-          const chargeStrength = ${allowSelection ? "-2500" : "-Math.max(120, Math.min(900, areaPerNode / 55))"};
-          const linkDistance = ${allowSelection ? "350" : "Math.max(120, Math.min(340, Math.sqrt(areaPerNode) * 0.9))"};
-          const collideRadius = ${allowSelection ? "25" : "Math.max(20, Math.min(55, Math.sqrt(areaPerNode) * 0.12))"};
-
-          nodes.forEach((node) => {
-            if (!Number.isFinite(node.x) || !Number.isFinite(node.y)) {
-              node.x = Math.random() * width;
-              node.y = Math.random() * height;
-            }
-          });
-
-
-          // Create a wrapper to hold SVG + node cards together for unified zoom
-          const graphWrapper = d3.select('#graph-container')
-            .append('div')
-            .attr('id', 'graph-wrapper')
-            .style('transform-origin', '0 0')
-            .style('position', 'relative')
-            .style('width', width + 'px')
-            .style('height', height + 'px');
-
-          const svg = graphWrapper
-            .append('svg')
-            .attr('width', width)
-            .attr('height', height)
-            .style('position', 'absolute')
-            .style('top', '0')
-            .style('left', '0')
-            .style('overflow', 'visible');
-
-  
-          const simulation = d3.forceSimulation(nodes)
-        .force('charge', d3.forceManyBody().strength(chargeStrength))
-        .force('link', d3.forceLink(links).id(d => d.id).distance(linkDistance))
-        .force('collide', d3.forceCollide().radius(collideRadius).strength(0.9));
-
-
-
-          simulation.alpha(1).restart(); 
-          let currentZoom = 1;
-          let currentTranslate = { x: 0, y: 0 };
-
-          const zoom = d3.zoom()
-            .scaleExtent([0.3, 3])  // min and max zoom
-            .on('zoom', (event) => {
-              currentZoom = event.transform.k;
-              currentTranslate = { x: event.transform.x, y: event.transform.y };
-
-              graphWrapper
-                .style('transform', 'translate(' + currentTranslate.x + 'px,' + currentTranslate.y + 'px) scale(' + currentZoom + ')');
-
-            });
-
-          d3.select('#graph-container').call(zoom);
-          d3.select('#graph-container').call(zoom.transform, d3.zoomIdentity.scale(0.7));
-
-
-
-          function showHandAnimation() {
-            setTimeout(() => {
-              const simNodes = simulation.nodes(); 
-              if (simNodes.length === 0) return; 
-
-              const randomNode = simNodes[Math.floor(Math.random() * simNodes.length)]; 
-              if (!randomNode) return; // Ensure it's valid
-
-              const handIcon = d3.select("#graph-container")
-                .append("img")
-                .attr("src", "hand.svg")  
-                .attr("class", "hand-icon")
-                .style("position", "absolute")
-                .style("width", "40px") 
-                .style("height", "40px")
-                .style("opacity", 1)
-                .style("left", randomNode.x + "px") 
-                .style("top", randomNode.y + "px");
-
-              let dragCount = 0;
-              
-              function animateHand() {
-                if (dragCount > 3) {
-                  handIcon.transition().duration(2000).style("opacity", 0).remove(); 
-                  return;
-                }
-                handIcon.transition()
-                  .duration(500)
-                  .style("left", (randomNode.x + 20) + "px") // Move right
-                  .style("top", (randomNode.y + 10) + "px")
-                  .transition()
-                  .duration(500)
-                  .style("left", (randomNode.x - 10) + "px") // Move left
-                  .style("top", (randomNode.y - 10) + "px")
-                  .on("end", () => {
-                    dragCount++;
-                    animateHand();
-                  });
-              }
-              animateHand();
-            }, 500); 
-          }
-
-          simulation.on("end", showHandAnimation); 
-
-          const dragHandler = d3.drag()
-            .on("start", (event, d) => {
-              if (!event.active) simulation.alphaTarget(0.3).restart();
-              d.fx = d.x;
-              d.fy = d.y;
-            })
-            .on("drag", (event, d) => {
-              d.fx = event.x;
-              d.fy = event.y;
-            })
-            .on("end", (event, d) => {
-              if (!event.active) simulation.alphaTarget(0);
-              d.fx = null;
-              d.fy = null;
-            });
-
-
-          const nodeElements = svg.selectAll('.node')
-            .data(nodes)
-            .enter()
-            .append('circle')
-            .attr('class', 'node')
-            .attr('r', ${allowSelection ? 3 : 6})
-            .attr('fill', d => d.color || '#3498db') 
-            .call(dragHandler); 
-         
-          nodeElements.on("click", (event, d) => {
-            d3.select(event.target).classed("selected", !d3.select(event.target).classed("selected"));
-          });
-
-          const linkElements = svg.selectAll('.link')
-            .data(links)
-            .enter()
-            .append('line')
-            .attr('class', 'link')
-            .style('stroke', '#aaa')
-            .style('stroke-width', ${allowSelection ? 1 : 2});
-
-
-          const linkLabels = svg.selectAll('.link-label')
-            .data(links)
-            .enter()
-            .append('text')
-            .attr('class', 'link-label')
-            .attr('text-anchor', 'middle')
-            .attr('dy', -5)
-            .style('font-size', '${allowSelection ? 10 : 14}px')
-            .text(d => d.type);
-
-    
-    
-          const nodeCards = graphWrapper
-            .selectAll('.node-card')
-            .data(nodes)
-            .enter()
-            .append('div')
-            .attr('class', 'node-card')
-            .style('position', 'absolute')
-            .style('background', d => d.color)
-            .style('border-radius', '12px')
-            .style('padding', '${allowSelection ? 6 : 10}px')
-            .style('color', '#333333')
-            .style('box-shadow', '0px 4px 8px rgba(0, 0, 0, 0.1)')
-            .style('width', '${allowSelection ? 100 : 150}px') 
-            .style('height', 'auto') 
-            .style('overflow', 'hidden') 
-            .style('transition', 'transform 0.2s, box-shadow 0.2s') 
-            .style('cursor', 'pointer')
-            .each(function (d) {
-              const card = d3.select(this);
-              card.append('h3')
-                .style('margin', '0 0 10px 0')
-                .style('font-size', '${allowSelection ? 14 : 18}px')
-                .style('font-weight', '600')
-                .style('color', '#333')
-                .style('text-align', 'center')
-                .text(d.properties.name || d.properties.title);
-
-              card.append('p')
-                .style('margin', '0')
-                .style('font-size', '${allowSelection ? 12 : 14}px')
-                .style('color', '#666')
-                .style('text-align', 'center')
-                .text(d.label);
-
-              const detailsDiv = card.append('div')
-                .attr('class', 'node-details')
-                .style('display', 'none')
-                .style('margin-top', '10px')
-                .style('font-size', '12px')
-                .style('color', '#eee');
-
-              for (const key in d.properties) {
-                if (d.properties.hasOwnProperty(key)) {
-                  detailsDiv.append('p')
-                    .text(key + ': ' + d.properties[key]);
-                }
-              }
-            })
-
-            .on('click', function (event, d) {
-              event.stopPropagation();
-              const card = d3.select(this);
-              card.classed("selected", !card.classed("selected"));
-            })
-
-            .on('dblclick', function (event, d) {
-              const card = d3.select(this);
-              const isExpanded = card.classed('expanded');
-              if (isExpanded) {
-                card.classed('expanded', false)
-                  .style('width', '${allowSelection ? 100 : 150}px')
-                  .style('height', 'auto')
-                  .style('background', d.color)
-                  .style('box-shadow', '0px 4px 8px rgba(0, 0, 0, 0.1)')
-                  .style('z-index', 1);
-
-                card.select('.node-details').style('display', 'none');
-              } else {
-                card.classed('expanded', true)
-                  .style('width', '300px')
-                  .style('background', '#fff')
-                  .style('box-shadow', '0px 4px 12px rgba(0, 0, 0, 0.2)')
-                  .style('z-index', 1000);
-
-                const detailsDiv = card.select('.node-details');
-                if (d.properties.image_data) {
-                  detailsDiv.append('img')
-                    .attr('src', 'data:image/jpeg;base64,' + d.properties.image_data)
-                    .style('width', '100%')
-                    .style('border-radius', '8px')
-                    .style('margin-top', '10px');
-                }
-                detailsDiv.style('display', 'block')
-                  .style('margin-top', '10px')
-                  .style('font-size', '${allowSelection ? 12 : 14}px')
-                  .style('color', '#444')
-                  .style('line-height', '1.6')
-                  .style('background', '#f9f9f9')
-                  .style('border-radius', '8px')
-                  .style('padding', '${allowSelection ? 6 : 10}px')
-                  .style('box-shadow', '0px 2px 6px rgba(0, 0, 0, 0.1)')
-                  .style('max-height', '150px')
-                  .style('overflow-y', 'auto');
-              }
-            });
-
-          dragHandler(nodeCards);
-
-          // Expands the render area so nodes remain visible while dragging/panning.
-          function updateRenderBounds() {
-            if (!nodes.length) return;
-            const padding = ${allowSelection ? 80 : 140};
-            const maxX = d3.max(nodes, d => (Number.isFinite(d.x) ? d.x : 0)) + padding;
-            const maxY = d3.max(nodes, d => (Number.isFinite(d.y) ? d.y : 0)) + padding;
-            const renderWidth = Math.max(width, maxX);
-            const renderHeight = Math.max(height, maxY);
-
-            graphWrapper
-              .style('width', renderWidth + 'px')
-              .style('height', renderHeight + 'px');
-
-            svg
-              .attr('width', renderWidth)
-              .attr('height', renderHeight);
-          }
-
-
-          simulation.on('tick', () => {
-            updateRenderBounds();
-
-            nodeCards
-              .style('left', d => d.x + 'px')
-              .style('top', d => d.y + 'px');
-
-            linkElements
-            .attr('x1', d => {
-              return d.source.x;
-            })
-            .attr('y1', d => d.source.y)
-            .attr('x2', d => d.target.x)
-            .attr('y2', d => d.target.y);
-          
-
-            linkLabels
-            .attr('x', d => (d.source.x + d.target.x) / 2) 
-            .attr('y', d => (d.source.y + d.target.y) / 2);
-                  });
-
-            ${allowSelection ? `
-document.getElementById("showSelectedBtn").addEventListener("click", () => {
-
-  const selectedNodes = nodes.filter(n => {
-    const card = d3.selectAll('.node-card').filter(d => d.id === n.id);
-    return card.classed("selected");
-  });
-
-  if (selectedNodes.length === 0) {
-    alert("No nodes selected!");
-    return;
-  }
-
-
-  const selectedNodeIds = new Set(selectedNodes.map(n => n.id));
-
-
-  const selectedLinks = links.filter(l =>
-    selectedNodeIds.has(l.source.id || l.source) &&
-    selectedNodeIds.has(l.target.id || l.target)
-  );
-
-  // 🧹 Clear old content
-d3.select("#graph-container").selectAll("*").remove();
-
-// 🟢 Create wrapper for SVG + cards (for unified zoom/pan)
-const subWrapper = d3.select("#graph-container")
-  .append("div")
-  .attr("id", "subgraph-wrapper")
-  .style("position", "relative")
-  .style("transform-origin", "0 0")
-  .style("width", width + "px")
-  .style("height", height + "px");
-
-const subSvg = subWrapper
-  .append("svg")
-  .attr("width", width)
-  .attr("height", height)
-  .style("position", "absolute")
-  .style("top", "0")
-  .style("left", "0")
-  .style("overflow", "visible");
-
-// 🧲 Subgraph simulation
-const subSim = d3.forceSimulation(selectedNodes)
-  .force('charge', d3.forceManyBody().strength(-1500))
-  .force('center', d3.forceCenter(width / 2, height / 2))
-  .force('link', d3.forceLink(selectedLinks).id(d => d.id).distance(250))
-  .force('collide', d3.forceCollide().radius(25).strength(1));
-
-// 🟢 Enable zoom + pan
-let subZoomLevel = 1;
-let subTranslate = { x: 0, y: 0 };
-
-const subZoom = d3.zoom()
-  .scaleExtent([0.3, 3])
-  .on("zoom", (event) => {
-    subZoomLevel = event.transform.k;
-    subTranslate = { x: event.transform.x, y: event.transform.y };
-
-    subWrapper.style(
-      "transform",
-      "translate(" + subTranslate.x + "px," + subTranslate.y + "px) scale(" + subZoomLevel + ")"
-    );
-  });
-
-d3.select("#graph-container").call(subZoom);
-
-// 🧭 Start slightly zoomed out so all selected nodes are visible
-d3.select("#graph-container").call(subZoom.transform, d3.zoomIdentity.scale(0.7));
-
-
-
-  const subLinks = subSvg.selectAll(".link")
-    .data(selectedLinks)
-    .enter()
-    .append("line")
-    .attr("class", "link")
-    .attr("stroke", "#999")
-    .attr("stroke-width", 2);
-
-
-  const subLinkLabels = subSvg.selectAll(".link-label")
-    .data(selectedLinks)
-    .enter()
-    .append("text")
-    .attr("class", "link-label")
-    .attr("text-anchor", "middle")
-    .attr("dy", -5)
-    .style("font-size", "14px")
-    .style("fill", "#333")
-    .style("pointer-events", "none")
-    .text(d => d.type);
-
-  const subCards = subWrapper
-    .selectAll('.node-card')
-    .data(selectedNodes)
-    .enter()
-    .append('div')
-    .attr('class', 'node-card')
-    .style('position', 'absolute')
-    .style('background', d => d.color)
-    .style('border-radius', '12px')
-    .style('padding', '${allowSelection ? 6 : 10}px')
-    .style('color', '#333333')
-    .style('box-shadow', '0px 4px 8px rgba(0, 0, 0, 0.1)')
-    .style('width', '${allowSelection ? 100 : 150}px')
-    .style('cursor', 'pointer')
-    .each(function (d) {
-      const card = d3.select(this);
-      card.append('h3')
-        .style('margin', '0 0 10px 0')
-        .style('font-size', '${allowSelection ? 14 : 18}px')
-
-        .style('font-weight', '600')
-        .style('color', '#333')
-        .style('text-align', 'center')
-        .text(d.properties.name || d.properties.title);
-
-      card.append('p')
-        .style('margin', '0')
-        .style('font-size', '${allowSelection ? 12 : 14}px')
-        .style('color', '#666')
-        .style('text-align', 'center')
-        .text(d.label);
-    })
-
-    .on('click', function (event, d) {
-      event.stopPropagation();
-      const card = d3.select(this);
-      const isExpanded = card.classed('expanded');
-
-      if (isExpanded) {
-        card.classed('expanded', false)
-          .style('width', '${allowSelection ? 100 : 150}px')
-          .style('height', 'auto')
-          .style('background', d.color)
-          .style('box-shadow', '0px 4px 8px rgba(0, 0, 0, 0.1)')
-          .style('z-index', 1);
-        card.select('.node-details').remove();
-      } else {
-        card.classed('expanded', true)
-          .style('width', '300px')
-          .style('background', '#fff')
-          .style('box-shadow', '0px 4px 12px rgba(0, 0, 0, 0.2)')
-          .style('z-index', 1000);
-
-        const detailsDiv = card.append('div')
-          .attr('class', 'node-details')
-          .style('display', 'block')
-          .style('margin-top', '10px')
-          .style('font-size', '${allowSelection ? 12 : 14}px')
-          .style('color', '#444')
-          .style('line-height', '1.6')
-          .style('background', '#f9f9f9')
-          .style('border-radius', '8px')
-          .style('padding', '${allowSelection ? 6 : 10}px')
-          .style('box-shadow', '0px 2px 6px rgba(0, 0, 0, 0.1)')
-          .style('max-height', '150px')
-          .style('overflow-y', 'auto');
-
-        for (const key in d.properties) {
-          if (d.properties.hasOwnProperty(key)) {
-            detailsDiv.append('p').text(key + ': ' + d.properties[key]);
-          }
         }
       }
     });
-
-  const dragHandler = d3.drag()
-    .on("start", (event, d) => {
-      if (!event.active) subSim.alphaTarget(0.3).restart();
-      d.fx = d.x;
-      d.fy = d.y;
-    })
-    .on("drag", (event, d) => {
-      d.fx = event.x;
-      d.fy = event.y;
-    })
-    .on("end", (event, d) => {
-      if (!event.active) subSim.alphaTarget(0);
-      d.fx = null;
-      d.fy = null;
-    });
-
-  dragHandler(subCards);
-
-  // Expands subgraph canvas bounds based on active node positions.
-  function updateSubRenderBounds() {
-    if (!selectedNodes.length) return;
-    const padding = 80;
-    const maxX = d3.max(selectedNodes, d => (Number.isFinite(d.x) ? d.x : 0)) + padding;
-    const maxY = d3.max(selectedNodes, d => (Number.isFinite(d.y) ? d.y : 0)) + padding;
-    const renderWidth = Math.max(width, maxX);
-    const renderHeight = Math.max(height, maxY);
-
-    subWrapper
-      .style("width", renderWidth + "px")
-      .style("height", renderHeight + "px");
-
-    subSvg
-      .attr("width", renderWidth)
-      .attr("height", renderHeight);
-  }
-
-  subSim.on("tick", () => {
-    updateSubRenderBounds();
-    subLinks
-      .attr("x1", d => d.source.x)
-      .attr("y1", d => d.source.y)
-      .attr("x2", d => d.target.x)
-      .attr("y2", d => d.target.y);
-
-    subLinkLabels
-      .attr("x", d => (d.source.x + d.target.x) / 2)
-      .attr("y", d => (d.source.y + d.target.y) / 2);
-
-    subCards
-      .style("left", d => d.x + "px")
-      .style("top", d => d.y + "px");
   });
+
+  // Drop links whose endpoints aren't in the node set (from OPTIONAL MATCH nulls)
+  const validLinks = links.filter((l) => seen.has(l.source) && seen.has(l.target));
+
+  const colorsJson = JSON.stringify(
+    nodes.reduce((acc, n) => { acc[n.label] = getLabelColor(n.label); return acc; }, {})
+  );
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, 'Inter', sans-serif;
+    background: #f9fafb; overflow: hidden;
+    width: 100vw; height: 100vh;
+    opacity: 0; transition: opacity 0.5s ease;
+  }
+  body.ready { opacity: 1; }
+  #container { width: 100%; height: 100%; position: relative; overflow: hidden; cursor: grab; }
+  #container:active { cursor: grabbing; }
+  #cards {
+    position: absolute; top: 0; left: 0; width: 0; height: 0;
+    transform-origin: 0 0; pointer-events: none;
+  }
+  .node-card {
+    position: absolute; background: #fff; border-radius: 10px;
+    padding: 11px 13px; cursor: pointer; width: 180px;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.09);
+    border-left: 4px solid #e5e7eb;
+    transition: box-shadow 0.15s, transform 0.1s;
+    user-select: none; pointer-events: all;
+  }
+  .node-card:hover { box-shadow: 0 6px 16px rgba(0,0,0,0.14); transform: translateY(-2px); }
+  .node-card.selected { box-shadow: 0 0 0 2.5px #2563eb, 0 6px 16px rgba(0,0,0,0.12); }
+  .node-name {
+    font-size: 14px; font-weight: 600; color: #111827;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px;
+  }
+  .node-label-tag {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.07em;
+    color: #9ca3af; text-transform: uppercase;
+  }
+  .link-label-text {
+    font-size: 11px; font-weight: 500; fill: #6b7280;
+    pointer-events: none; font-family: -apple-system, sans-serif;
+    paint-order: stroke; stroke: #f9fafb; stroke-width: 3.5px; stroke-linejoin: round;
+  }
+  .hint {
+    position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+    background: rgba(17,24,39,0.72); color: #fff; font-size: 11px;
+    padding: 6px 12px; border-radius: 6px; white-space: nowrap;
+    pointer-events: none; transition: opacity 0.6s; font-family: -apple-system, sans-serif;
+  }
+  .empty {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: #9ca3af; font-size: 13px; font-family: -apple-system, sans-serif;
+  }
+</style>
+<script src="https://d3js.org/d3.v6.min.js"></script>
+</head>
+<body>
+<div id="container">
+  <svg id="svg" style="position:absolute;top:0;left:0;width:100%;height:100%;"></svg>
+  <div id="cards"></div>
+  ${nodes.length === 0 ? '<div class="empty">No nodes returned for this query.</div>' : ''}
+  <div class="hint" id="hint">Click a node for details &nbsp;·&nbsp; Drag to move &nbsp;·&nbsp; Scroll to zoom</div>
+</div>
+<script>
+const rawNodes    = ${JSON.stringify(nodes)};
+const rawLinks    = ${JSON.stringify(validLinks)};
+const labelColors = ${colorsJson};
+
+const W = window.innerWidth;
+const H = window.innerHeight;
+const nodeCount = Math.max(rawNodes.length, 1);
+const area      = (W * H) / nodeCount;
+const charge    = -Math.max(400, Math.min(1400, area / 22));
+const linkDist  = Math.max(150, Math.min(320, Math.sqrt(area) * 1.0));
+const collide   = Math.max(95, Math.min(130, Math.sqrt(area) * 0.13));
+
+rawNodes.forEach(n => {
+  if (!Number.isFinite(n.x)) { n.x = W/2 + (Math.random()-0.5)*300; n.y = H/2 + (Math.random()-0.5)*300; }
 });
 
-              
+const svg   = d3.select("#svg");
+const zoomG = svg.append("g");
+const cards = d3.select("#cards");
 
-                document.getElementById("clearSelectionBtn").addEventListener("click", () => {
-                  d3.selectAll(".node-card").classed("selected", false);
-d3.select("#graph-container").selectAll("*").remove();
-
-// 🟢 Recreate wrapper for unified zoom + pan
-const fullWrapper = d3.select("#graph-container")
-  .append("div")
-  .attr("id", "graph-wrapper")
-  .style("position", "relative")
-  .style("transform-origin", "0 0")
-  .style("width", width + "px")
-  .style("height", height + "px");
-
-const fullSvg = fullWrapper
-  .append("svg")
-  .attr("width", width)
-  .attr("height", height)
-  .style("position", "absolute")
-  .style("top", "0")
-  .style("left", "0")
-  .style("overflow", "visible");
-
-// 🧲 Restore full simulation
-const fullSim = d3.forceSimulation(nodes)
-  .force('charge', d3.forceManyBody().strength(-2500))
-  .force('center', d3.forceCenter(width / 2, height / 2))
-  .force('link', d3.forceLink(links).id(d => d.id).distance(350))
-  .force('collide', d3.forceCollide().radius(25).strength(1));
-
-// 🟢 Reattach D3 zoom and pan
-let fullZoomLevel = 1;
-let fullTranslate = { x: 0, y: 0 };
-
-const fullZoom = d3.zoom()
-  .scaleExtent([0.3, 3])
-  .on("zoom", (event) => {
-    fullZoomLevel = event.transform.k;
-    fullTranslate = { x: event.transform.x, y: event.transform.y };
-    fullWrapper.style(
-      "transform",
-      "translate(" + fullTranslate.x + "px," + fullTranslate.y + "px) scale(" + fullZoomLevel + ")"
-    );
+const zoom = d3.zoom()
+  .scaleExtent([0.15, 3])
+  .on("zoom", (e) => {
+    zoomG.attr("transform", e.transform);
+    cards.style("transform",
+      "translate(" + e.transform.x + "px," + e.transform.y + "px) scale(" + e.transform.k + ")");
   });
 
-d3.select("#graph-container").call(fullZoom);
-d3.select("#graph-container").call(fullZoom.transform, d3.zoomIdentity.scale(0.7));
+d3.select("#container").call(zoom);
 
+// Links
+const linkEls = zoomG.selectAll("line")
+  .data(rawLinks).enter().append("line")
+  .attr("stroke", "#cbd5e1").attr("stroke-width", 1.5);
 
+const linkLabelEls = zoomG.selectAll(".link-label-text")
+  .data(rawLinks).enter().append("text")
+  .attr("class", "link-label-text")
+  .attr("text-anchor", "middle").attr("dy", -3)
+  .text(d => d.type);
 
-                  const fullLinks = fullSvg.selectAll(".link")
-                    .data(links)
-                    .enter()
-                    .append("line")
-                    .attr("class", "link")
-                    .attr("stroke", "#aaa")
-                    .attr("stroke-width", 2);
+// Click / drag discrimination: a drag that barely moves counts as a click.
+let moved = false, sx = 0, sy = 0;
+const dragBehavior = d3.drag()
+  .on("start", function (event, d) {
+    moved = false; sx = event.x; sy = event.y;
+    if (!event.active) sim.alphaTarget(0.3).restart();
+    d.fx = d.x; d.fy = d.y;
+  })
+  .on("drag", function (event, d) {
+    if (Math.hypot(event.x - sx, event.y - sy) > 4) moved = true;
+    d.fx = event.x; d.fy = event.y;
+  })
+  .on("end", function (event, d) {
+    if (!event.active) sim.alphaTarget(0);
+    d.fx = null; d.fy = null;
+    if (!moved) {
+      d3.selectAll(".node-card").classed("selected", false);
+      d3.select(this).classed("selected", true);
+      window.parent.postMessage({
+        type: "NODE_CLICK",
+        node: { id: d.id, label: d.label, properties: d.properties }
+      }, "*");
+    }
+  });
 
+const cardEls = cards.selectAll(".node-card")
+  .data(rawNodes).enter().append("div")
+  .attr("class", "node-card")
+  .each(function (d) {
+    const col = labelColors[d.label] || { bg: "#f3f4f6", border: "#d1d5db", text: "#374151" };
+    d3.select(this).style("background", col.bg).style("border-left-color", col.border);
+    d3.select(this).append("div").attr("class", "node-name")
+      .text(d.properties.name || d.properties.title || d.label);
+    d3.select(this).append("div").attr("class", "node-label-tag")
+      .style("color", col.text).text(d.label);
+  })
+  .call(dragBehavior);
 
-                  const fullLinkLabels = fullSvg.selectAll(".link-label")
-                    .data(links)
-                    .enter()
-                    .append("text")
-                    .attr("class", "link-label")
-                    .attr("text-anchor", "middle")
-                    .attr("dy", -5)
-                    .style("font-size", "14px")
-                    .style("fill", "#333")
-                    .style("pointer-events", "none")
-                    .text(d => d.type);
+const sim = d3.forceSimulation(rawNodes)
+  .force("charge",  d3.forceManyBody().strength(charge))
+  .force("link",    d3.forceLink(rawLinks).id(d => d.id).distance(linkDist))
+  .force("collide", d3.forceCollide().radius(collide).strength(0.85))
+  .force("center",  d3.forceCenter(W / 2, H / 2))
+  .stop(); // don't animate on screen — we settle it first, below
 
-                  const fullCards = fullWrapper
-                    .selectAll('.node-card')
-                    .data(nodes)
-                    .enter()
-                    .append('div')
-                    .attr('class', 'node-card')
-                    .style('position', 'absolute')
-                    .style('background', d => d.color)
-                    .style('border-radius', '12px')
-                    .style('padding', '${allowSelection ? 6 : 10}px')
-                    .style('color', '#333333')
-                    .style('box-shadow', '0px 4px 8px rgba(0, 0, 0, 0.1)')
-                    .style('width', '${allowSelection ? 100 : 150}px')
-                    .style('cursor', 'pointer')
-                    .each(function (d) {
-                      const card = d3.select(this);
-                      card.append('h3')
-                        .style('margin', '0 0 10px 0')
-                        .style('font-size', '${allowSelection ? 14 : 18}px')
+function render() {
+  linkEls
+    .attr("x1", d => d.source.x).attr("y1", d => d.source.y)
+    .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+  linkLabelEls
+    .attr("x", d => (d.source.x + d.target.x) / 2)
+    .attr("y", d => (d.source.y + d.target.y) / 2);
+  cardEls
+    .style("left", d => (d.x - 90) + "px")
+    .style("top",  d => (d.y - 26) + "px");
+}
 
-                        .style('font-weight', '600')
-                        .style('color', '#333')
-                        .style('text-align', 'center')
-                        .text(d.properties.name || d.properties.title);
+// Fit all nodes into view.
+function fitView(animate) {
+  if (!rawNodes.length) return;
+  const pad = 110;
+  const xs = rawNodes.map(n => n.x), ys = rawNodes.map(n => n.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const gw = (maxX - minX) + pad * 2, gh = (maxY - minY) + pad * 2;
+  let scale = Math.min(W / gw, H / gh);
+  scale = Math.max(0.5, Math.min(scale, 1.05));
+  const tx = (W - scale * (minX + maxX)) / 2;
+  const ty = (H - scale * (minY + maxY)) / 2;
+  const t = d3.zoomIdentity.translate(tx, ty).scale(scale);
+  const sel = d3.select("#container");
+  if (animate) sel.transition().duration(400).call(zoom.transform, t);
+  else sel.call(zoom.transform, t);
+}
 
-                      card.append('p')
-                        .style('margin', '0')
-                        .style('font-size', '${allowSelection ? 12 : 14}px')
-                        .style('color', '#666')
-                        .style('text-align', 'center')
-                        .text(d.label);
-                    })
-                    // Click to select
-                    .on('click', function (event, d) {
-                      event.stopPropagation();
-                      const card = d3.select(this);
-                      card.classed("selected", !card.classed("selected"));
-                    })
-                    // Double-click to expand details
-                    .on('dblclick', function (event, d) {
-                      const card = d3.select(this);
-                      const isExpanded = card.classed('expanded');
-                      if (isExpanded) {
-                        card.classed('expanded', false)
-                          .style('width', '${allowSelection ? 100 : 150}px')
-                          .style('height', 'auto')
-                          .style('background', d.color)
-                          .style('box-shadow', '0px 4px 8px rgba(0, 0, 0, 0.1)')
-                          .style('z-index', 1);
-                        card.select('.node-details').remove();
-                      } else {
-                        card.classed('expanded', true)
-                          .style('width', '300px')
-                          .style('background', '#fff')
-                          .style('box-shadow', '0px 4px 12px rgba(0, 0, 0, 0.2)')
-                          .style('z-index', 1000);
+// Pre-settle the layout off-screen so it doesn't fly around on first paint.
+const preTicks = Math.min(400, 120 + rawNodes.length * 4);
+for (let i = 0; i < preTicks; i++) sim.tick();
 
-                        const detailsDiv = card.append('div')
-                          .attr('class', 'node-details')
-                          .style('display', 'block')
-                          .style('margin-top', '10px')
-                          .style('font-size', '${allowSelection ? 12 : 14}px')
-                          .style('color', '#444')
-                          .style('line-height', '1.6')
-                          .style('background', '#f9f9f9')
-                          .style('border-radius', '8px')
-                          .style('padding', '${allowSelection ? 6 : 10}px')
-                          .style('box-shadow', '0px 2px 6px rgba(0, 0, 0, 0.1)')
-                          .style('max-height', '150px')
-                          .style('overflow-y', 'auto');
+render();
+fitView(false);
 
-                        for (const key in d.properties) {
-                          if (d.properties.hasOwnProperty(key)) {
-                            detailsDiv.append('p').text(key + ': ' + d.properties[key]);
-                          }
-                        }
-                      }
-                    });
+// Keep drag interactive (neighbours react) via the tick handler.
+sim.on("tick", render);
 
+// Fade the settled graph in.
+requestAnimationFrame(() => { document.body.classList.add("ready"); });
 
-                  const dragHandler = d3.drag()
-                    .on("start", (event, d) => {
-                      if (!event.active) fullSim.alphaTarget(0.3).restart();
-                      d.fx = d.x;
-                      d.fy = d.y;
-                    })
-                    .on("drag", (event, d) => {
-                      d.fx = event.x;
-                      d.fy = event.y;
-                    })
-                    .on("end", (event, d) => {
-                      if (!event.active) fullSim.alphaTarget(0);
-                      d.fx = null;
-                      d.fy = null;
-                    });
+setTimeout(() => { const h = document.getElementById("hint"); if (h) h.style.opacity = "0"; }, 3500);
 
-                  dragHandler(fullCards);
-
-                  // Expands full graph canvas bounds based on active node positions.
-                  function updateFullRenderBounds() {
-                    if (!nodes.length) return;
-                    const padding = 80;
-                    const maxX = d3.max(nodes, d => (Number.isFinite(d.x) ? d.x : 0)) + padding;
-                    const maxY = d3.max(nodes, d => (Number.isFinite(d.y) ? d.y : 0)) + padding;
-                    const renderWidth = Math.max(width, maxX);
-                    const renderHeight = Math.max(height, maxY);
-
-                    fullWrapper
-                      .style("width", renderWidth + "px")
-                      .style("height", renderHeight + "px");
-
-                    fullSvg
-                      .attr("width", renderWidth)
-                      .attr("height", renderHeight);
-                  }
-
-                  fullSim.on("tick", () => {
-                    updateFullRenderBounds();
-                    fullLinks
-                      .attr("x1", d => d.source.x)
-                      .attr("y1", d => d.source.y)
-                      .attr("x2", d => d.target.x)
-                      .attr("y2", d => d.target.y);
-
-                    fullLinkLabels
-                      .attr("x", d => (d.source.x + d.target.x) / 2)
-                      .attr("y", d => (d.source.y + d.target.y) / 2);
-
-                    fullCards
-                      .style("left", d => d.x + "px")
-                      .style("top", d => d.y + "px");
-                  });
-                });
-            ` : ""}
-
-            document.getElementById("updateLimitBtn").addEventListener("click", async () => {
-              const newLimit = document.getElementById("limitInput").value || 10;
-              const parentWindow = window.parent;
-
-              // Send the new limit to React parent
-              parentWindow.postMessage({ type: "UPDATE_LIMIT", limit: Number(newLimit) }, "*");
-            });
-
-        </script>
-      </body>
-      </html>
-    `;
-
-
-
-    return htmlContent;
+// Click empty space to deselect
+document.getElementById("container").addEventListener("click", (e) => {
+  if (e.target.id === "container" || e.target.id === "svg" || e.target.tagName === "svg") {
+    d3.selectAll(".node-card").classed("selected", false);
+    window.parent.postMessage({ type: "NODE_DESELECT" }, "*");
+  }
+});
+</script>
+</body>
+</html>`;
 };
