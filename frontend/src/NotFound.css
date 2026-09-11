@@ -1,0 +1,80 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --nf-bg: #fafafa;
+  --nf-surface: #ffffff;
+  --nf-border: #e4e4e7;
+  --nf-text-1: #18181b;
+  --nf-text-2: #52525b;
+  --nf-text-3: #a1a1aa;
+  --nf-accent: #4f46e5;
+  --nf-accent-hover: #4338ca;
+}
+:root[data-theme="dark"] {
+  --nf-bg: #101012;
+  --nf-surface: #1c1c21;
+  --nf-border: #33333a;
+  --nf-text-1: #f4f4f5;
+  --nf-text-2: #a1a1aa;
+  --nf-text-3: #71717a;
+  --nf-accent: #6366f1;
+  --nf-accent-hover: #818cf8;
+}
+
+.nf-root {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--nf-bg);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  padding: 24px;
+}
+.nf-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  background: var(--nf-surface);
+  border: 1px solid var(--nf-border);
+  border-radius: 16px;
+  padding: 48px 56px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 12px 32px rgba(0,0,0,0.06);
+  max-width: 420px;
+}
+.nf-mark { font-size: 30px; color: var(--nf-accent); margin-bottom: 6px; }
+.nf-code {
+  font-size: 56px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: var(--nf-text-1);
+  line-height: 1;
+  margin-bottom: 10px;
+}
+.nf-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--nf-text-1);
+  margin-bottom: 8px;
+}
+.nf-text {
+  font-size: 13px;
+  color: var(--nf-text-2);
+  line-height: 1.55;
+  margin-bottom: 26px;
+}
+.nf-btn {
+  padding: 10px 22px;
+  border: none;
+  border-radius: 10px;
+  background: var(--nf-accent);
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+.nf-btn:hover { background: var(--nf-accent-hover); }
+.nf-btn:active { transform: scale(0.98); }
