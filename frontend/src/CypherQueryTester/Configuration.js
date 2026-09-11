@@ -4,33 +4,32 @@ import ConfigurationView from "./components/ConfigurationView";
 import {
   fetchConnectionLabels,
   fetchSavedConnections,
-  saveConnectionRecord,
-} from "./utils/configurationUtils";
+  saveConnectionRecord } from
+"./utils/configurationUtils";
 
 const ConfigurationPage = () => {
-  const [uri,            setUri]            = useState("");
-  const [username,       setUsername]       = useState("");
-  const [password,       setPassword]       = useState("");
+  const [uri, setUri] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [connectionName, setConnectionName] = useState("");
-  const [nodes,          setNodes]          = useState([]);
-  const [connected,      setConnected]      = useState(false);
-  const [connections,    setConnections]    = useState([]);
-  const [error,          setError]          = useState("");
-  const [showPassword,   setShowPassword]   = useState(false);
-  const [loading,        setLoading]        = useState(false);
-  const [nodesLoading,   setNodesLoading]   = useState(false);
+  const [nodes, setNodes] = useState([]);
+  const [connected, setConnected] = useState(false);
+  const [connections, setConnections] = useState([]);
+  const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [nodesLoading, setNodesLoading] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
     const token = localStorage.getItem("token");
-    if (!token) { window.location.href = "/login"; return; }
+    if (!token) {window.location.href = "/login";return;}
 
-    // "Change DB" sends forceForm — show the connection form instead of auto-reconnecting.
     if (location.state?.forceForm) return;
 
-    const savedUri      = sessionStorage.getItem("neo4j_uri");
+    const savedUri = sessionStorage.getItem("neo4j_uri");
     const savedUsername = sessionStorage.getItem("neo4j_username");
     const savedPassword = sessionStorage.getItem("neo4j_password");
 
@@ -55,18 +54,23 @@ const ConfigurationPage = () => {
 
   const fetchLabelsWithCredentials = async (u, n, p) => {
     setNodesLoading(true);
+    setError("");
     try {
       const { response, data } = await fetchConnectionLabels({ uri: u, username: n, password: p });
       if (response.ok) {
         setNodes(data.labels.map((label) => ({ label })));
         storeLabels(data.labels);
+      } else {
+        setError(data.error || "Could not load node types from the database.");
       }
     } catch (err) {
-      console.error("Error fetching labels:", err);
+      setError("Could not reach the backend. Is it running on port 3001?");
     } finally {
       setNodesLoading(false);
     }
   };
+
+  const retryLabels = () => fetchLabelsWithCredentials(uri, username, password);
 
   const connectToNeo4j = async () => {
     setError("");
@@ -82,7 +86,7 @@ const ConfigurationPage = () => {
         storeLabels(data.labels);
         setConnected(true);
 
-        sessionStorage.setItem("neo4j_uri",      uri);
+        sessionStorage.setItem("neo4j_uri", uri);
         sessionStorage.setItem("neo4j_username", username);
         sessionStorage.setItem("neo4j_password", password);
 
@@ -112,15 +116,15 @@ const ConfigurationPage = () => {
 
   const handleNodeClick = (node) => {
     localStorage.setItem("nodeLabel", node.label);
-    sessionStorage.setItem("neo4j_uri",      uri);
+    sessionStorage.setItem("neo4j_uri", uri);
     sessionStorage.setItem("neo4j_username", username);
     sessionStorage.setItem("neo4j_password", password);
     navigate("/cypherquerytester", {
       state: {
         selectedNode: node,
         allLabels: nodes.map((n) => n.label),
-        uri, username, password,
-      },
+        uri, username, password
+      }
     });
   };
 
@@ -159,8 +163,8 @@ const ConfigurationPage = () => {
       onNodeClick={handleNodeClick}
       nodesLoading={nodesLoading}
       onSwitchDb={handleSwitchDb}
-    />
-  );
+      onRetry={retryLabels} />);
+
 };
 
 export default ConfigurationPage;

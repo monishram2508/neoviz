@@ -35,7 +35,6 @@
   -webkit-font-smoothing: antialiased;
 }
 
-/* ── NAVBAR ── */
 .cfg-navbar {
   height: 56px;
   background: var(--surface);
@@ -93,7 +92,6 @@
   background: var(--danger-soft);
 }
 
-/* ── LAYOUT ── */
 .cfg-main {
   display: flex;
   flex-direction: column;
@@ -102,7 +100,6 @@
   min-height: calc(100vh - 56px);
 }
 
-/* ── STEP INDICATOR ── */
 .cfg-steps {
   display: flex;
   align-items: center;
@@ -157,7 +154,6 @@
   border-radius: 1px;
 }
 
-/* ── CONNECT CARD ── */
 .cfg-card {
   width: 100%;
   max-width: 420px;
@@ -303,7 +299,6 @@
   background: var(--border);
 }
 
-/* ── EXPLORE (connected state) ── */
 .cfg-explore {
   width: 100%;
   max-width: 640px;
@@ -440,7 +435,6 @@
 
 .cfg-node-card:hover .cfg-node-arrow { opacity: 1; transform: translateX(0); }
 
-/* skeletons */
 .cfg-skeleton {
   height: 56px;
   border-radius: 12px;
@@ -449,7 +443,6 @@
   animation: shimmer 1.3s ease-in-out infinite;
 }
 
-/* full-page loading */
 .cfg-loading {
   display: flex;
   flex-direction: column;
@@ -493,3 +486,50 @@
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+:root[data-theme="dark"] {
+  --bg: #101012;
+  --surface: #1c1c21;
+  --surface-2: #26262c;
+  --border: #33333a;
+  --border-strong: #45454d;
+  --text-1: #f4f4f5;
+  --text-2: #a1a1aa;
+  --text-3: #71717a;
+  --accent: #818cf8;
+  --accent-hover: #a5b4fc;
+  --accent-soft: rgba(99, 102, 241, 0.16);
+  --accent-ring: rgba(129, 140, 248, 0.22);
+  --green: #4ade80;
+  --green-soft: rgba(74, 222, 128, 0.1);
+  --green-border: rgba(74, 222, 128, 0.3);
+  --danger: #f87171;
+  --danger-soft: rgba(248, 113, 113, 0.1);
+  --danger-border: rgba(248, 113, 113, 0.3);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 1px 3px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+:root[data-theme="dark"] .cfg-input:hover,
+:root[data-theme="dark"] .cfg-select:hover { border-color: #52525b; }
+
+.cfg-grid-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 28px 0;
+}
+.cfg-grid-empty-text { font-size: 13px; color: var(--text-2); max-width: 460px; line-height: 1.6; }
+.cfg-retry-btn {
+  padding: 9px 18px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text-1);
+  font-family: var(--font);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.cfg-retry-btn:hover { background: var(--surface-2); border-color: var(--accent); }
