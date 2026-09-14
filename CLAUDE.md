@@ -121,8 +121,8 @@ Keywords live as an array property on `Work` nodes (`keywords` English, `keyword
 
 The right panel is tabbed: **Inspect** (the original node detail + NL query), **Keywords**, **Compare**.
 
-- *Find a keyword → its works*: keyword chips in the Inspect tab and the searchable browse list in the Keywords tab both call `openKeyword()`, which runs `worksWithKeywordQuery()`. That query pulls each work **plus its author via `OPTIONAL MATCH (a:Author)-[r:WROTE]->(w)`** — without the author the result is unlinked nodes and D3 renders a scatter instead of a graph.
-- *Compare works → shared keywords*: "+ Add to comparison" stores `{title, author, keywords}` in `sessionStorage["neoviz_compare"]`. The intersection is computed client-side from properties already in hand, so no extra round-trip. Splits results into "In all N" and "In some".
+- *Find keywords → their works*: every keyword chip (Inspect tab, Keywords tab list, Compare tab shared-keyword chips) calls `toggleKeyword()`, which adds or removes that keyword from `activeKeywords` and re-runs `worksWithKeywordsQuery(kws, mode)`. That query pulls each work **plus its author via `OPTIONAL MATCH (a:Author)-[r:WROTE]->(w)`** — without the author the result is unlinked nodes and D3 renders a scatter instead of a graph.
+- *Compare works → shared keywords*: clicking a Work in the graph while the Compare tab is active stores `{title, author, keywords}` in `sessionStorage["neoviz_compare"]`. The intersection is computed client-side from properties already in hand, so no extra round-trip. Splits results into "In all N" and "In some".
 - *Normalisation*: `normKey()` in `CypherQueryTester.js` mirrors `canon.py` in the import pipeline — NFKC, curly→straight quotes, en/em dash→hyphen, whitespace collapse, strip edge punctuation (including Urdu `،` `۔`), lowercase. **Change both together or search silently breaks.** Cypher matching also uses `toLower(trim(k))` as a second line of defence.
 
 Data pipeline lives in `data/`: `Bayaaz-e-Hayaat Metadata_Keywords.xlsx` (Nazia's sheet, the source of truth) → `import_keywords_sept.cypher` (generated). `backup_keywords_before_sept_import.json` is the rollback snapshot of keyword state prior to the September import.
@@ -136,6 +136,22 @@ Data pipeline lives in `data/`: `Bayaaz-e-Hayaat Metadata_Keywords.xlsx` (Nazia'
 - **404 page**: `NotFound.js` on the `*` route, theme-aware.
 - Keyword display is first-letter-capitalised via `displayKw()` — display only, matching still uses `normKey`.
 
+**Multi-keyword filter (September 14 2026):**
+
+The Keywords tab is a *faceted* filter, not a single-keyword lookup. `activeKeywords` is an array; `kwMode` is `"all"` (default, intersect) or `"any"` (union). The Cypher is built by `worksWithKeywordsQuery`:
+
+```
+WITH [toLower("a"), toLower("b")] AS sel
+MATCH (w:Work) WHERE w.keywords IS NOT NULL
+  AND all(t IN sel WHERE any(k IN w.keywords WHERE toLower(trim(k)) = t))
+```
+
+**Why faceting is not optional:** 602 of 729 keywords (83%) sit on exactly one work, so most keyword pairs intersect to *nothing*. A plain multi-select would hand users an empty graph almost every time. So after each query `worksFromRecords()` extracts the matching `Work` nodes, `facetCounts` recounts every keyword **within that result set**, and the browse list is filtered to those keywords with the narrowed counts. A keyword that would produce zero results is therefore not in the list to be clicked. Verified against live data: the facet count predicts the subsequent AND result exactly, at one, two and three keywords deep. Faceting is skipped in `"any"` mode, where adding a keyword broadens rather than narrows.
+
+Breadcrumbs: consecutive keyword filters *replace* the top nav entry rather than stacking (`type: "keyword"`, carries `kws` so `jumpTo` can restore the selection). Any non-keyword navigation (`resetToRoot`, `switchLabel`, `handleExpand`, `jumpToEntity`, NL query) clears the filter via `setKws([])`.
+
+Compare-tab shared keywords are ranked **rarest-first by archive frequency** (`vocabCount`), not alphabetically, and anything at or above `hubThreshold` (60% of the most common keyword's count) is dimmed as a hub. Two works sharing "Hyderabad" (17 works) is noise; sharing "Autobiographical subjectivity" (2 works) is the finding. Each chip shows its archive frequency and clicking it feeds the keyword filter — that is what turns compare from a dead-end list into a research move.
+
 **Still needed:**
 - `Mundadugu` exists twice in the DB with conflicting years (1945 vs 1980) and two variant author nodes ("Sunkara and Vasireddi" vs "Sunkara Satyanarayana and V. Bhaskara Rao") — needs a human decision, likely Nazia's team
 - Replace remaining `alert()` popups in `Configuration.js` with inline error UI
@@ -147,6 +163,6 @@ Data pipeline lives in `data/`: `Bayaaz-e-Hayaat Metadata_Keywords.xlsx` (Nazia'
 - **Neo4j driver per request:** Each `/query` and `/nl-query` call creates and closes a new `neo4j.driver` instance. This works but is not connection-pooled.
 - **D3 in iframe:** The graph lives inside an `<iframe srcDoc={...}>`. To pass data between the iframe and React, use `window.postMessage` (already wired for limit updates).
 - **Groq model:** `llama-3.3-70b-versatile` (the original `llama3-70b-8192` was decommissioned July 2026). If deprecated again, check https://console.groq.com/docs/models and update the string in `/nl-query` in `backend/index.js`.
-- **Graph iframe contract:** iframe → parent messages: `NODE_CLICK {node}`, `NODE_DESELECT`. The graph pre-settles its force simulation (sim.stop() + manual ticks) before first paint, then fades in — don't reintroduce live-settling on load, it looks chaotic.
+- **Graph iframe contract:** iframe → parent messages: `NODE_CLICK {node}`, `NODE_DESELECT`; parent → iframe: `COMPARE_SET {titles}`. The graph pre-settles its force simulation (sim.stop() + manual ticks) before first paint, then fades in — don't reintroduce live-settling on load, it looks chaotic.
 - **Root query pattern:** `MATCH (n:\`Label\`) WITH n LIMIT 15 OPTIONAL MATCH (n)-[r]-(m) RETURN n, r, m` — the OPTIONAL MATCH is what makes relationships appear on the initial view.
 - **Database files from original student:** Gadha (prior BTP student) provided a JSON file and a `.cypher` file with literary work data to populate a fresh Neo4j instance. These files were not in this directory — ask the user where they are if needed for database setup.
