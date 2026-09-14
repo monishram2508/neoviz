@@ -41,10 +41,29 @@ const jumpQueryFor = (name) => {
   return `MATCH (n) WHERE n.name = "${esc}" OR n.title = "${esc}" OPTIONAL MATCH (n)-[r]-(m) RETURN n, r, m LIMIT 40`;
 };
 
-const worksWithKeywordQuery = (kw) =>
-`MATCH (w:Work) WHERE any(k IN w.keywords WHERE toLower(trim(k)) = toLower("${escapeCypher(kw)}"))
+const worksWithKeywordsQuery = (kws, mode) => {
+  const sel = kws.map((k) => `toLower("${escapeCypher(k)}")`).join(", ");
+  const fn = mode === "any" ? "any" : "all";
+  return `WITH [${sel}] AS sel
+MATCH (w:Work) WHERE w.keywords IS NOT NULL
+  AND ${fn}(t IN sel WHERE any(k IN w.keywords WHERE toLower(trim(k)) = t))
 OPTIONAL MATCH (a:Author)-[r:WROTE]->(w)
 RETURN w, r, a`;
+};
+
+const worksFromRecords = (records) => {
+  const out = new Map();
+  (records || []).forEach((rec) => {
+    Object.values(rec || {}).forEach((v) => {
+      if (!v || typeof v !== "object" || !Array.isArray(v.labels)) return;
+      if (!v.labels.includes("Work")) return;
+      const title = String(v.properties?.title ?? "").trim();
+      if (!title || out.has(title)) return;
+      out.set(title, { title, keywords: asKeywordList(v.properties?.keywords) });
+    });
+  });
+  return [...out.values()];
+};
 
 const VOCAB_QUERY = `MATCH (w:Work) WHERE w.keywords IS NOT NULL
 UNWIND w.keywords AS raw
@@ -134,7 +153,9 @@ function CypherQueryTester() {
   const [vocab, setVocab] = useState([]);
   const [vocabLoading, setVocabLoading] = useState(false);
   const [kwFilter, setKwFilter] = useState("");
-  const [activeKeyword, setActiveKeyword] = useState("");
+  const [activeKeywords, setActiveKeywords] = useState([]);
+  const [kwMode, setKwMode] = useState("all");
+  const [resultWorks, setResultWorks] = useState([]);
   const [compare, setCompare] = useState(() => {
     try {return JSON.parse(sessionStorage.getItem("neoviz_compare") || "[]");}
     catch {return [];}
@@ -162,6 +183,13 @@ function CypherQueryTester() {
   useEffect(() => {themeRef.current = theme;}, [theme]);
   const compareRef = useRef(compare);
   useEffect(() => {compareRef.current = compare;}, [compare]);
+  const activeKeywordsRef = useRef(activeKeywords);
+  const kwModeRef = useRef(kwMode);
+
+  const setKws = (kws) => {
+    activeKeywordsRef.current = kws;
+    setActiveKeywords(kws);
+  };
 
   const renderOpts = () => ({
     theme: themeRef.current,
@@ -179,9 +207,10 @@ function CypherQueryTester() {
     setCompareViewOn(false);
     try {
       const data = await runCypherQuery({ cypher, uri, username, password });
-      if (data?.error) {setError(data.error);setGraphHtml("");return;}
+      if (data?.error) {setError(data.error);setGraphHtml("");setResultWorks([]);return;}
       const records = Array.isArray(data) ? data : [];
       lastRecordsRef.current = records;
+      setResultWorks(worksFromRecords(records));
       setGraphHtml(buildResultsPageContent(records, renderOpts()));
     } catch {
       setError("Failed to reach the backend. Is it running on port 3001?");
@@ -299,16 +328,19 @@ function CypherQueryTester() {
   const jumpTo = (index) => {
     const entry = navStack[index];
     setNavStack((prev) => prev.slice(0, index + 1));
+    setKws(entry.type === "keyword" ? entry.kws || [] : []);
     fetchAndRender(entry.cypher);
   };
 
   const resetToRoot = () => {
     if (!navStack.length) return;
+    setKws([]);
     setNavStack((prev) => [prev[0]]);
     fetchAndRender(navStack[0].cypher);
   };
 
   const switchLabel = (newLabel) => {
+    setKws([]);
     setLabel(newLabel);
     localStorage.setItem("nodeLabel", newLabel);
     const root = { label: newLabel, cypher: rootQueryFor(newLabel) };
@@ -318,6 +350,7 @@ function CypherQueryTester() {
 
   const handleExpand = () => {
     if (!selectedNode) return;
+    setKws([]);
     const name = selectedNode.properties?.name || selectedNode.properties?.title || selectedNode.label;
     const safeName = String(name).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
     pushAndLoad({
@@ -326,17 +359,50 @@ function CypherQueryTester() {
     });
   };
 
-  const openKeyword = (kw) => {
+  const keywordEntry = (kws, mode) => ({
+    label: kws.length === 1 ? `#${kws[0]}` : `#${kws.length} keywords`,
+    fullLabel:
+    kws.length === 1 ?
+    `Works tagged "${kws[0]}"` :
+    `Works tagged ${mode === "any" ? "any of" : "all of"}: ${kws.join(", ")}`,
+    cypher: worksWithKeywordsQuery(kws, mode),
+    type: "keyword",
+    kws
+  });
+
+  const applyKeywordFilter = (kws, mode) => {
+    setTab("keywords");
+    if (!kws.length) {resetToRoot();return;}
+    setKws(kws);
+    const entry = keywordEntry(kws, mode);
+    setNavStack((prev) => {
+      const last = prev[prev.length - 1];
+      if (prev.length > 1 && last?.type === "keyword") return [...prev.slice(0, -1), entry];
+      return [...prev, entry];
+    });
+    fetchAndRender(entry.cypher);
+  };
+
+  const toggleKeyword = (kw) => {
     const clean = String(kw).trim();
     if (!clean) return;
-    setActiveKeyword(clean);
-    setTab("keywords");
-    pushAndLoad({
-      label: `#${clean}`,
-      fullLabel: `Works tagged "${clean}"`,
-      cypher: worksWithKeywordQuery(clean),
-      type: "keyword"
-    });
+    const key = normKey(clean);
+    const prev = activeKeywordsRef.current;
+    const exists = prev.some((k) => normKey(k) === key);
+    applyKeywordFilter(
+      exists ? prev.filter((k) => normKey(k) !== key) : [...prev, clean],
+      kwModeRef.current
+    );
+  };
+
+  const clearKeywords = () => applyKeywordFilter([], kwModeRef.current);
+
+  const switchKwMode = (mode) => {
+    kwModeRef.current = mode;
+    setKwMode(mode);
+    if (activeKeywordsRef.current.length > 1) {
+      applyKeywordFilter(activeKeywordsRef.current, mode);
+    }
   };
 
   const toggleCompare = (node) => {
@@ -428,6 +494,7 @@ function CypherQueryTester() {
   }, [tab]);
 
   const jumpToEntity = (name) => {
+    setKws([]);
     setSearchQ("");
     setSearchOpen(false);
     setSearchResults([]);
@@ -555,6 +622,8 @@ function CypherQueryTester() {
       setNavStack((prev) => [...prev, { label: qid, fullLabel: q, cypher: data.cypher, type: "query" }]);
       const records = Array.isArray(data.data) ? data.data : [];
       lastRecordsRef.current = records;
+      setResultWorks(worksFromRecords(records));
+      setKws([]);
       setCompareViewOn(false);
       setGraphHtml(buildResultsPageContent(records, renderOpts()));
       setSelectedNode(null);
@@ -597,10 +666,34 @@ function CypherQueryTester() {
   const chip = selectedNode ? labelChip(selectedNode.label) : null;
   const selectedKeywords = keywordsOf(selectedNode);
 
+  const activeKeySet = new Set(activeKeywords.map(normKey));
+
+  const facetCounts = (() => {
+    if (!activeKeywords.length || kwMode !== "all" || !resultWorks.length) return null;
+    const m = new Map();
+    resultWorks.forEach((w) => {
+      new Set(w.keywords.map(normKey)).forEach((k) => {
+        if (k) m.set(k, (m.get(k) || 0) + 1);
+      });
+    });
+    return m;
+  })();
+
   const filteredVocab = (() => {
     const q = normKey(kwFilter);
-    const list = q ? vocab.filter((v) => normKey(v.keyword).includes(q)) : vocab;
-    return list.slice(0, 300);
+    let list = vocab;
+    if (facetCounts) {
+      list = list.
+      filter((v) => facetCounts.has(normKey(v.keyword))).
+      map((v) => ({ ...v, works: facetCounts.get(normKey(v.keyword)) }));
+    }
+    if (q) list = list.filter((v) => normKey(v.keyword).includes(q));
+    return [...list].sort((a, b) => {
+      const aSel = activeKeySet.has(normKey(a.keyword)) ? 1 : 0;
+      const bSel = activeKeySet.has(normKey(b.keyword)) ? 1 : 0;
+      if (aSel !== bSel) return bSel - aSel;
+      return b.works - a.works || a.keyword.localeCompare(b.keyword);
+    }).slice(0, 300);
   })();
 
   return (
@@ -814,7 +907,7 @@ function CypherQueryTester() {
                       key={k}
                       className="kw-chip"
                       title={`Show every work tagged "${displayKw(k)}"`}
-                      onClick={() => openKeyword(k)}>
+                      onClick={() => toggleKeyword(k)}>
                       
                           {displayKw(k)}
                         </button>
@@ -925,10 +1018,11 @@ function CypherQueryTester() {
 
             {tab === "keywords" &&
             <>
-                <p className="panel-section-label">Find a keyword</p>
+                <p className="panel-section-label">Filter by keyword</p>
                 <p className="panel-hint">
-                  Search or pick a keyword to see every work tagged with it,
-                  across all authors.
+                  Click keywords to build a filter. The graph shows every work
+                  that matches, and the list below narrows to the keywords those
+                  works still share.
                 </p>
 
                 <input
@@ -938,22 +1032,71 @@ function CypherQueryTester() {
                 onChange={(e) => setKwFilter(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && filteredVocab.length) {
-                    openKeyword(filteredVocab[0].keyword);
+                    toggleKeyword(filteredVocab[0].keyword);
+                    setKwFilter("");
                   }
                 }} />
-              
 
-                {activeKeyword &&
+
+                {activeKeywords.length > 0 &&
               <div className="kw-active">
-                    Showing works tagged
-                    <strong> {activeKeyword}</strong>
-                    <button
-                  className="kw-active-clear"
-                  onClick={() => {setActiveKeyword("");resetToRoot();}}
-                  title="Clear">
-                  
-                      ✕
-                    </button>
+                    <div className="kw-active-head">
+                      <span className="kw-active-title">
+                        {loading ?
+                    "Filtering…" :
+                    `${resultWorks.length} work${resultWorks.length === 1 ? "" : "s"} match`}
+                      </span>
+                      <button
+                    className="kw-active-clear"
+                    onClick={clearKeywords}
+                    title="Clear the whole filter">
+                    
+                        Clear
+                      </button>
+                    </div>
+
+                    <div className="kw-chips">
+                      {activeKeywords.map((k) =>
+                  <button
+                    key={k}
+                    className="kw-chip selected"
+                    onClick={() => toggleKeyword(k)}
+                    title="Remove from filter">
+                    
+                          {displayKw(k)}
+                          <span className="kw-chip-x">✕</span>
+                        </button>
+                  )}
+                    </div>
+
+                    {activeKeywords.length > 1 &&
+                <div className="kw-mode">
+                        <span className="kw-mode-label">Match</span>
+                        <div className="kw-mode-seg">
+                          <button
+                      className={`kw-mode-btn${kwMode === "all" ? " active" : ""}`}
+                      onClick={() => switchKwMode("all")}
+                      title="Only works carrying every selected keyword">
+                      
+                            All
+                          </button>
+                          <button
+                      className={`kw-mode-btn${kwMode === "any" ? " active" : ""}`}
+                      onClick={() => switchKwMode("any")}
+                      title="Works carrying at least one selected keyword">
+                      
+                            Any
+                          </button>
+                        </div>
+                      </div>
+                }
+
+                    {!loading && resultWorks.length === 0 &&
+                <p className="kw-empty">
+                        No work carries all of these together.
+                        {activeKeywords.length > 1 && " Switch to Any, or drop a keyword."}
+                      </p>
+                }
                   </div>
               }
 
@@ -968,22 +1111,40 @@ function CypherQueryTester() {
                 {!vocabLoading && vocab.length > 0 &&
               <>
                     <div className="kw-meta">
-                      {kwFilter ?
-                  `${filteredVocab.length} match${filteredVocab.length === 1 ? "" : "es"}` :
-                  `${vocab.length} keywords`}
+                      <span>
+                        {kwFilter ?
+                    `${filteredVocab.length} match${filteredVocab.length === 1 ? "" : "es"}` :
+                    `${filteredVocab.length} keyword${filteredVocab.length === 1 ? "" : "s"}`}
+                      </span>
+                      {facetCounts &&
+                  <span className="kw-meta-note">counts within matches</span>
+                  }
                     </div>
-                    <div className="kw-list">
-                      {filteredVocab.map((v) =>
-                  <button
-                    key={v.keyword}
-                    className={`kw-row${normKey(v.keyword) === normKey(activeKeyword) ? " active" : ""}`}
-                    onClick={() => openKeyword(v.keyword)}>
-                    
-                          <span className="kw-row-text">{displayKw(v.keyword)}</span>
-                          <span className="kw-row-count">{v.works}</span>
-                        </button>
-                  )}
-                    </div>
+
+                    {filteredVocab.length === 0 ?
+                <p className="panel-hint">
+                        Nothing left to narrow by — remove a keyword to widen the
+                        search.
+                      </p> :
+
+                <div className="kw-list">
+                        {filteredVocab.map((v) => {
+                    const on = activeKeySet.has(normKey(v.keyword));
+                    return (
+                      <button
+                        key={v.keyword}
+                        className={`kw-row${on ? " active" : ""}`}
+                        onClick={() => toggleKeyword(v.keyword)}
+                        title={on ? "Remove from filter" : "Add to filter"}>
+                        
+                              <span className="kw-row-mark">{on ? "✓" : "+"}</span>
+                              <span className="kw-row-text">{displayKw(v.keyword)}</span>
+                              <span className="kw-row-count">{v.works}</span>
+                            </button>);
+
+                  })}
+                      </div>
+                }
                   </>
               }
               </>
@@ -1057,7 +1218,7 @@ function CypherQueryTester() {
                   <button
                     key={s.keyword}
                     className="kw-chip strong"
-                    onClick={() => openKeyword(s.keyword)}
+                    onClick={() => toggleKeyword(s.keyword)}
                     title={`Show every work tagged "${displayKw(s.keyword)}"`}>
                     
                             {displayKw(s.keyword)}
@@ -1077,7 +1238,7 @@ function CypherQueryTester() {
                     <button
                       key={s.keyword}
                       className="kw-chip"
-                      onClick={() => openKeyword(s.keyword)}
+                      onClick={() => toggleKeyword(s.keyword)}
                       title={`Shared by ${s.n} of the selected works`}>
                       
                               {displayKw(s.keyword)}
