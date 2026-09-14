@@ -821,6 +821,9 @@
 }
 .kw-chip-x { font-size: 9px; opacity: 0.7; }
 .kw-chip.selected .kw-chip-x { color: #fff; }
+.kw-chip.hub { opacity: 0.45; }
+.kw-chip.hub:hover { opacity: 1; }
+
 .kw-mode { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
 .kw-mode-label {
   font-size: 10px;

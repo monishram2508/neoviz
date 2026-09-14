@@ -568,6 +568,14 @@ function CypherQueryTester() {
 
   });
 
+  const vocabCount = (() => {
+    const m = new Map();
+    vocab.forEach((v) => m.set(normKey(v.keyword), v.works));
+    return m;
+  })();
+
+  const hubThreshold = Math.max(3, Math.ceil((vocab[0]?.works || 1) * 0.6));
+
   const comparison = (() => {
     if (compare.length < 2) return { shared: [], partial: [] };
     const seen = new Map();
@@ -580,15 +588,17 @@ function CypherQueryTester() {
       });
     });
     const shared = [],partial = [];
-    seen.forEach((v) => {
+    seen.forEach((v, k) => {
       const n = v.titles.size;
-      if (n === compare.length) shared.push({ keyword: v.display, n });else
-      if (n >= 2) partial.push({ keyword: v.display, n });
+      const freq = vocabCount.get(k) ?? n;
+      const row = { keyword: v.display, n, freq, hub: freq >= hubThreshold };
+      if (n === compare.length) shared.push(row);else
+      if (n >= 2) partial.push(row);
     });
-    const byName = (a, b) => a.keyword.localeCompare(b.keyword);
+    const byRarity = (a, b) => a.freq - b.freq || a.keyword.localeCompare(b.keyword);
     return {
-      shared: shared.sort(byName),
-      partial: partial.sort((a, b) => b.n - a.n || byName(a, b))
+      shared: shared.sort(byRarity),
+      partial: partial.sort((a, b) => b.n - a.n || byRarity(a, b))
     };
   })();
 
@@ -1213,18 +1223,30 @@ function CypherQueryTester() {
                         No keyword appears in every selected work.
                       </p> :
 
-                <div className="kw-chips">
+                <>
+                      <p className="panel-hint">
+                        Rarest first — the number is how many works in the whole
+                        archive carry it, so a low number is a stronger link.
+                        Click one to filter the archive by it.
+                      </p>
+                      <div className="kw-chips">
                         {comparison.shared.map((s) =>
-                  <button
-                    key={s.keyword}
-                    className="kw-chip strong"
-                    onClick={() => toggleKeyword(s.keyword)}
-                    title={`Show every work tagged "${displayKw(s.keyword)}"`}>
-                    
-                            {displayKw(s.keyword)}
-                          </button>
-                  )}
+                    <button
+                      key={s.keyword}
+                      className={`kw-chip strong${s.hub ? " hub" : ""}`}
+                      onClick={() => toggleKeyword(s.keyword)}
+                      title={
+                      s.hub ?
+                      `Common across the archive — on ${s.freq} works` :
+                      `On ${s.freq} work${s.freq === 1 ? "" : "s"} in the archive — click to filter`
+                      }>
+                      
+                              {displayKw(s.keyword)}
+                              <span className="kw-chip-n">{s.freq}</span>
+                            </button>
+                    )}
                       </div>
+                    </>
                 }
 
                     {comparison.partial.length > 0 &&
@@ -1237,9 +1259,9 @@ function CypherQueryTester() {
                           {comparison.partial.map((s) =>
                     <button
                       key={s.keyword}
-                      className="kw-chip"
+                      className={`kw-chip${s.hub ? " hub" : ""}`}
                       onClick={() => toggleKeyword(s.keyword)}
-                      title={`Shared by ${s.n} of the selected works`}>
+                      title={`Shared by ${s.n} of the selected works — on ${s.freq} in the archive`}>
                       
                               {displayKw(s.keyword)}
                               <span className="kw-chip-n">{s.n}</span>
