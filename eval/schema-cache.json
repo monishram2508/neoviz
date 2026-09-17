@@ -1,0 +1,37 @@
+{
+  "at": "2026-09-14T04:58:01.186Z",
+  "source": "derived from data/archive_backup_2026-09-14.json (database unreachable)",
+  "labels": [
+    "Author",
+    "Genre",
+    "Language",
+    "Magazine",
+    "Work"
+  ],
+  "relationshipTypes": [
+    "HAS_GENRE",
+    "PUBLISHED_IN",
+    "USES_LANGUAGE",
+    "WROTE"
+  ],
+  "propertyKeys": [
+    "author",
+    "bio",
+    "description",
+    "digitisedText",
+    "engInfo",
+    "genre",
+    "id",
+    "image",
+    "keywords",
+    "keywordsUrdu",
+    "language",
+    "magazine",
+    "name",
+    "publication_date",
+    "title",
+    "type",
+    "urduInfo",
+    "year"
+  ]
+}

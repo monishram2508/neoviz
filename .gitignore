@@ -6,3 +6,7 @@ build/
 .env
 users.db
 uploads/
+
+# eval run artifacts — keep the directory, not the output
+eval/results/*
+!eval/results/.gitkeep

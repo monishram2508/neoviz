@@ -1,0 +1,52 @@
+{
+  "//": "Run `npm run discover` to list what is callable right now, then edit this file.",
+  "//note": "The Groq free tier carries no Llama chat models as of Sept 2026. whisper-* are speech, llama-prompt-guard-* are safety classifiers, orpheus/allam are not general chat — none are usable here.",
+  "defaults": {
+    "temperature": 0,
+    "maxTokens": 600,
+    "timeoutMs": 60000
+  },
+  "models": [
+    {
+      "id": "groq/gpt-oss-120b",
+      "provider": "groq",
+      "model": "openai/gpt-oss-120b",
+      "enabled": true,
+      "note": "what the app ships with today — this is the baseline to beat"
+    },
+    {
+      "id": "groq/gpt-oss-20b",
+      "provider": "groq",
+      "model": "openai/gpt-oss-20b",
+      "enabled": true,
+      "note": "smaller sibling; is the 120b worth it?"
+    },
+    {
+      "id": "groq/qwen3.8-27b",
+      "provider": "groq",
+      "model": "qwen/qwen3.8-27b",
+      "enabled": true
+    },
+    {
+      "id": "groq/compound-mini",
+      "provider": "groq",
+      "model": "groq/compound-mini",
+      "enabled": false,
+      "note": "agentic system rather than a plain chat model; may ignore the output format"
+    },
+    {
+      "id": "ollama/qwen2.5-coder-7b",
+      "provider": "ollama",
+      "model": "qwen2.5-coder:7b",
+      "enabled": false,
+      "note": "enable once pulled: ollama pull qwen2.5-coder:7b"
+    },
+    {
+      "id": "ollama/llama3.1-8b",
+      "provider": "ollama",
+      "model": "llama3.1:8b",
+      "enabled": false,
+      "note": "enable once pulled: ollama pull llama3.1:8b"
+    }
+  ]
+}

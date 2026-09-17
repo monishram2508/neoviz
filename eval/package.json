@@ -1,0 +1,14 @@
+{
+  "name": "neoviz-eval",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Benchmarks LLMs on natural-language-to-Cypher translation against the NeoViz archive graph.",
+  "main": "run_eval.js",
+  "scripts": {
+    "eval": "node run_eval.js",
+    "discover": "node run_eval.js --discover",
+    "validate-gold": "node run_eval.js --validate-gold"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": { "neo4j-driver": "^5.28.3" }
+}
