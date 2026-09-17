@@ -1,20 +1,24 @@
-require("dotenv").config();
-
+const path = require("path");
 const express = require("express");
 const cors = require("cors");
 const neo4j = require("neo4j-driver");
+const { config, checkConfig } = require("./config");
+
+checkConfig();
 
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const db = require("./db");
 const { authMiddleware, SECRET } = require("./middleware");
+const submissionsRouter = require("./submissions");
 
 const app = express();
-const PORT = 3001;
+const api = express.Router();
 
-app.use(cors());
+app.use(cors({ origin: config.corsOrigin }));
 app.use(express.json());
-app.post("/connect", authMiddleware, async (req, res) => {
+api.use(submissionsRouter);
+api.post("/connect", authMiddleware, async (req, res) => {
   let { uri, username, password } = req.body;
 
   if (!uri && req.body.connectionId) {
@@ -62,7 +66,7 @@ app.post("/connect", authMiddleware, async (req, res) => {
     await driver.close();
   }
 });
-app.post("/query", authMiddleware, async (req, res) => {
+api.post("/query", authMiddleware, async (req, res) => {
   let { cypher, uri, username, password } = req.body;
 
   if (!uri && req.body.connectionId) {
@@ -111,7 +115,7 @@ app.post("/query", authMiddleware, async (req, res) => {
   }
 });
 
-app.post("/register", async (req, res) => {
+api.post("/register", async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: "Missing fields" });
@@ -119,19 +123,23 @@ app.post("/register", async (req, res) => {
 
   const hashed = await bcrypt.hash(password, 10);
 
+  const role = config.moderatorEmails.includes(String(email).trim().toLowerCase()) ?
+  "moderator" :
+  "contributor";
+
   db.run(
-    "INSERT INTO users (email, password) VALUES (?, ?)",
-    [email, hashed],
+    "INSERT INTO users (email, password, role) VALUES (?, ?, ?)",
+    [email, hashed, role],
     function (err) {
       if (err) {
         return res.status(400).json({ error: "User already exists" });
       }
-      res.json({ success: true });
+      res.json({ success: true, role });
     }
   );
 });
 
-app.post("/login", (req, res) => {
+api.post("/login", (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: "Missing fields" });
@@ -150,18 +158,18 @@ app.post("/login", (req, res) => {
   });
 });
 
-app.get("/me", authMiddleware, (req, res) => {
+api.get("/me", authMiddleware, (req, res) => {
   db.get(
-    "SELECT neo4j_uri, neo4j_username, neo4j_password FROM users WHERE id = ?",
+    "SELECT email, role, neo4j_uri, neo4j_username, neo4j_password FROM users WHERE id = ?",
     [req.user.id],
     (err, user) => {
       if (!user) return res.json({});
-      res.json(user);
+      res.json({ ...user, role: user.role || "contributor" });
     }
   );
 });
 
-app.get("/connections", authMiddleware, (req, res) => {
+api.get("/connections", authMiddleware, (req, res) => {
   db.all(
     "SELECT id, uri, username, password, name FROM connections WHERE user_id = ?",
     [req.user.id],
@@ -174,7 +182,7 @@ app.get("/connections", authMiddleware, (req, res) => {
   );
 });
 
-app.post("/save-connection", authMiddleware, (req, res) => {
+api.post("/save-connection", authMiddleware, (req, res) => {
   const { uri, username, password, name } = req.body;
 
   db.run(
@@ -191,7 +199,7 @@ app.post("/save-connection", authMiddleware, (req, res) => {
   );
 });
 
-app.post("/nl-query", authMiddleware, async (req, res) => {
+api.post("/nl-query", authMiddleware, async (req, res) => {
   const { question, uri, username, password, nodeLabel } = req.body;
 
   if (!question || !uri || !username || !password) {
@@ -200,7 +208,7 @@ app.post("/nl-query", authMiddleware, async (req, res) => {
 
   try {
     const Groq = require("groq-sdk");
-    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+    const groq = new Groq({ apiKey: config.groqKey });
 
     let schemaNote = "";
     if (/^neo4j(\+s|\+ssc)?:\/\//.test(uri) || /^bolt(\+s|\+ssc)?:\/\//.test(uri)) {
@@ -299,13 +307,13 @@ app.post("/nl-query", authMiddleware, async (req, res) => {
   }
 });
 
-app.post("/explain", authMiddleware, async (req, res) => {
+api.post("/explain", authMiddleware, async (req, res) => {
   const { question, cypher, summary } = req.body;
   if (!summary) return res.status(400).json({ error: "Missing result summary" });
 
   try {
     const Groq = require("groq-sdk");
-    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+    const groq = new Groq({ apiKey: config.groqKey });
 
     const chatResponse = await groq.chat.completions.create({
       model: "openai/gpt-oss-120b",
@@ -339,9 +347,26 @@ app.post("/explain", authMiddleware, async (req, res) => {
   }
 });
 
-app.post("/sendContribution", authMiddleware, (req, res) => {
+api.post("/sendContribution", authMiddleware, (req, res) => {
 });
 
-app.listen(PORT, () => {
-  console.log(`Backend server is running on http://localhost:${PORT}`);
+app.use("/api", api);
+
+if (config.serveFrontend) {
+  const fs = require("fs");
+  if (fs.existsSync(config.frontendBuild)) {
+    app.use(express.static(config.frontendBuild));
+    app.get(/^(?!\/api\/).*/, (req, res) => {
+      res.sendFile(path.join(config.frontendBuild, "index.html"));
+    });
+    console.log(`Serving frontend from ${config.frontendBuild}`);
+  } else {
+    console.warn(`SERVE_FRONTEND is on but no build found at ${config.frontendBuild}`);
+    console.warn(`Run "npm run build" in the frontend directory.`);
+  }
+}
+
+app.listen(config.port, () => {
+  console.log(`Backend listening on port ${config.port}`);
+  console.log(`  API under /api  |  database ${config.dbFile}`);
 });

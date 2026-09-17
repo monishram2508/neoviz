@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./JsonImport.css";
 import { generateCypher, validateJson } from "./utils/jsonImportUtils";
+import { apiUrl } from "../api";
 
 export default function JsonImportPage() {
   const navigate = useNavigate();
@@ -67,7 +68,7 @@ export default function JsonImportPage() {
       const cypher = generateCypher(parsed);
       console.log("Generated Cypher:\n", cypher);
 
-      const res = await fetch("http://localhost:3001/query", {
+      const res = await fetch(apiUrl("query"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

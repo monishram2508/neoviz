@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { buildResultsPageContent } from "./utils/buildResultsPageContent";
 import { runCypherQuery } from "./utils/cypherQueryApi";
 import { useTheme } from "../theme";
+import { apiUrl } from "../api";
 
 const rootQueryFor = (label) =>
 `MATCH (n:\`${label}\`) WITH n ORDER BY toLower(coalesce(n.name, n.title, "")) LIMIT 15 OPTIONAL MATCH (n)-[r]-(m) RETURN n, r, m`;
@@ -541,7 +542,7 @@ function CypherQueryTester() {
     setExplainLoading(true);
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch("http://localhost:3001/explain", {
+      const res = await fetch(apiUrl("explain"), {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ question, cypher, summary: summarizeRecords(records) })
@@ -611,7 +612,7 @@ function CypherQueryTester() {
     setGeneratedQid("");
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch("http://localhost:3001/nl-query", {
+      const res = await fetch(apiUrl("nl-query"), {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ question: q, uri, username, password, nodeLabel: label })

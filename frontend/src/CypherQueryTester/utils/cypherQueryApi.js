@@ -1,4 +1,6 @@
-const QUERY_API_URL = "http://localhost:3001/query";
+import { apiUrl } from "../../api";
+
+const QUERY_API_URL = apiUrl("query");
 
 export const runCypherQuery = async ({ cypher, uri, username, password }) => {
   const token = localStorage.getItem("token");
