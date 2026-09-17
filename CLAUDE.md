@@ -152,7 +152,20 @@ Breadcrumbs: consecutive keyword filters *replace* the top nav entry rather than
 
 Compare-tab shared keywords are ranked **rarest-first by archive frequency** (`vocabCount`), not alphabetically, and anything at or above `hubThreshold` (60% of the most common keyword's count) is dimmed as a hub. Two works sharing "Hyderabad" (17 works) is noise; sharing "Autobiographical subjectivity" (2 works) is the finding. Each chip shows its archive frequency and clicking it feeds the keyword filter — that is what turns compare from a dead-end list into a research move.
 
+**Contribution + moderation backend (September 14 2026):**
+
+Public-archive groundwork, backend only — no UI yet.
+
+- `backend/normalize.js` — the server-side twin of `normKey`/`canon.py`. `cleanSurface`, `normKey`, `cleanList`, `cleanPair` (dedupes EN/UR **as pairs** so translations stay positionally aligned), `canonicalise` (snaps a submitted keyword onto the archive's existing spelling), `mergeKeywords`. **Three copies of this logic now exist** (Python import script, frontend, backend) — change them together.
+- `backend/archive.js` — server-side Neo4j connection read from `ARCHIVE_NEO4J_*` env vars. The frontend never sees these. `vocabulary()` returns the canonical keyword list with the most-frequent surface form winning; `writeArchive()` runs statements in a single transaction that rolls back on failure.
+- `backend/submissions.js` — the router. Submissions are staged in **SQLite, never in Neo4j**: a pending contribution must not be able to pollute anyone's query results, and rejecting one must be a row update, not graph surgery. Types are `add_keywords` and `new_work`. `GET /submissions/:id/preview` shows the moderator exactly what approving will do — which keywords match existing vocabulary, which are new to the archive, before/after counts, duplicate-title warnings — and `POST /submissions/:id/decide` executes *those same statements*. `keywordOverrides` on the decide call lets the moderator map a new keyword onto an existing one before it enters the vocabulary. All graph writes are parameterised; nothing is string-interpolated into Cypher.
+- Roles live in `users.role` (`reader`/`contributor`/`moderator`), looked up **from the database on every request** (`loadRole`) rather than trusted from the JWT, so a demotion takes effect immediately and old tokens can't carry stale privileges. `MODERATOR_EMAILS` in `.env` seeds moderators at boot and at registration.
+- Uploads: multer → `backend/uploads/` (gitignored), 20 MB cap, extension allowlist, random filenames. Rejected uploads are unlinked, not left on disk.
+
 **Still needed:**
+- Frontend for the above: `/contribute`, `/my-submissions`, `/moderate` pages
+- Phase B of uploads — the copyright question (can contributors upload full texts of in-copyright works?) must be settled with Nazia before building it
+- The app still sends the user's own Neo4j credentials from the browser with every query. That is fine while the user *is* the admin, but **must be replaced by the server-side archive connection before any public signup**, or a contributor would hold write access to the whole archive.
 - `Mundadugu` exists twice in the DB with conflicting years (1945 vs 1980) and two variant author nodes ("Sunkara and Vasireddi" vs "Sunkara Satyanarayana and V. Bhaskara Rao") — needs a human decision, likely Nazia's team
 - Replace remaining `alert()` popups in `Configuration.js` with inline error UI
 - `/sendContribution` endpoint is an empty stub
@@ -162,7 +175,8 @@ Compare-tab shared keywords are ranked **rarest-first by archive frequency** (`v
 - **Credentials file mismatch:** The handoff doc says Neo4j username is `"neo4j"` but the actual AuraDB credentials file shows username = `"5ac48bc9"` (matches the instance ID). Use the `.txt` file as truth.
 - **Neo4j driver per request:** Each `/query` and `/nl-query` call creates and closes a new `neo4j.driver` instance. This works but is not connection-pooled.
 - **D3 in iframe:** The graph lives inside an `<iframe srcDoc={...}>`. To pass data between the iframe and React, use `window.postMessage` (already wired for limit updates).
-- **Groq model:** `llama-3.3-70b-versatile` (the original `llama3-70b-8192` was decommissioned July 2026). If deprecated again, check https://console.groq.com/docs/models and update the string in `/nl-query` in `backend/index.js`.
+- **Groq model:** `openai/gpt-oss-120b`. Free-tier keys lost *all* Llama chat models in September 2026. Check live availability with `GET https://api.groq.com/openai/v1/models` — the docs page still lists models the free tier cannot use.
+- **`JWT_SECRET`** now has a fallback in `backend/.env`, so the server no longer crashes when it isn't exported. An exported value still takes precedence (dotenv does not override `process.env`).
 - **Graph iframe contract:** iframe → parent messages: `NODE_CLICK {node}`, `NODE_DESELECT`; parent → iframe: `COMPARE_SET {titles}`. The graph pre-settles its force simulation (sim.stop() + manual ticks) before first paint, then fades in — don't reintroduce live-settling on load, it looks chaotic.
 - **Root query pattern:** `MATCH (n:\`Label\`) WITH n LIMIT 15 OPTIONAL MATCH (n)-[r]-(m) RETURN n, r, m` — the OPTIONAL MATCH is what makes relationships appear on the initial view.
 - **Database files from original student:** Gadha (prior BTP student) provided a JSON file and a `.cypher` file with literary work data to populate a fresh Neo4j instance. These files were not in this directory — ask the user where they are if needed for database setup.

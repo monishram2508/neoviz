@@ -78,65 +78,91 @@ neoviz/
 
 ### Prerequisites
 
-- Node.js v14 or higher
+- Node.js v18 or higher
 - npm
 - A Neo4j database — [AuraDB Free](https://neo4j.com/cloud/aura) works and requires no local setup
-- A [Groq API key](https://console.groq.com) (free) for natural language queries
+- A [Groq API key](https://console.groq.com) (free, optional) for natural language queries
 
 ### Installation
 
-**1. Clone the repository**
-
 ```bash
-git clone https://github.com/yourusername/neoviz.git
-cd neoviz
+git clone https://github.com/monishram2508/neoviz.git
+cd neoviz/v4
+
+cd backend  && npm ci
+cd ../frontend && npm ci
 ```
 
-**2. Install backend dependencies**
+Use `npm ci` rather than `npm install` — it installs the exact versions in the
+lockfile, so every machine gets an identical tree. `bcrypt` and `sqlite3` are
+native modules and are compiled during install, so the machine needs build
+tools (`build-essential` on Debian/Ubuntu, Xcode command line tools on macOS).
+
+### Configuration
+
+All settings live in one file. Copy the template and fill it in:
 
 ```bash
 cd backend
-npm install
+cp .env.example .env
 ```
 
-**3. Install frontend dependencies**
+`JWT_SECRET` is the only setting the server refuses to start without. Generate one:
 
 ```bash
-cd ../frontend
-npm install
+node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 ```
 
-**4. Set up environment variables**
+Everything else is optional — the server starts and tells you which features
+are unavailable. `.env.example` documents every key.
 
-Create a `.env` file inside the `backend/` folder:
+### Running in development
 
-```env
-GROQ_API_KEY=your_groq_api_key_here
-```
-
-### Running the App
-
-**Start the backend** (from the `backend/` folder):
+Two terminals:
 
 ```bash
-export JWT_SECRET=your_secret_key_here
-node index.js
+# Terminal 1
+cd backend && npm start
+
+# Terminal 2
+cd frontend && npm start
 ```
 
-The backend runs on `http://localhost:3001`.
+The frontend proxies API calls to the backend automatically (the `proxy` field
+in `frontend/package.json`), so nothing needs configuring and there are no CORS
+problems. Open http://localhost:3000.
 
-**Start the frontend** (from the `frontend/` folder):
+### Running in production
+
+Build the frontend, then let the backend serve it. One process, one port, one origin:
 
 ```bash
-npm start
+cd frontend && npm run build
+cd ../backend && NODE_ENV=production PORT=8080 npm start
 ```
 
-You can now view frontend in the browser.
-```
-  Local:            http://localhost:3000
-  On Your Network:  http://<your_ip>:3000
-```
----
+The whole application is then on `http://localhost:8080` — the site at `/`, the
+API under `/api`. Put nginx or Apache in front of it for TLS and a domain name.
+
+To keep it running across reboots, use a process manager such as `systemd` or
+`pm2`. The server resolves its database and upload paths relative to its own
+location, not the working directory, so it can be started from anywhere.
+
+### Moving it to another machine
+
+Everything machine-specific is in `backend/.env`; nothing else needs editing.
+
+| What | Where it lives | Notes |
+|---|---|---|
+| Configuration | `backend/.env` | Never committed. Copy `.env.example` and fill in. |
+| User accounts, submissions | `backend/users.db` | SQLite file. Copy it to keep accounts; delete it to start clean — it is recreated on boot. |
+| Uploaded files | `backend/uploads/` | Copy alongside `users.db`; the two reference each other. |
+| The archive itself | Neo4j | Separate service. Point `ARCHIVE_NEO4J_*` at it. |
+
+`DB_FILE`, `UPLOAD_DIR` and `FRONTEND_BUILD` can be overridden in `.env` to
+point at a persistent disk when deploying.
+
+Port 7687 must be reachable for Neo4j. Some networks block it — see Notes.
 
 ## Usage
 
