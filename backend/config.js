@@ -30,6 +30,10 @@ const config = {
   jwtSecret: process.env.JWT_SECRET,
   groqKey: process.env.GROQ_API_KEY,
 
+  archiveSnapshot: process.env.ARCHIVE_SNAPSHOT ?
+  path.resolve(ROOT, process.env.ARCHIVE_SNAPSHOT) :
+  path.join(ROOT, "..", "..", "db", "backups", "archive_backup_2026-09-14.json"),
+
   archive: {
     uri: process.env.ARCHIVE_NEO4J_URI,
     username: process.env.ARCHIVE_NEO4J_USERNAME,

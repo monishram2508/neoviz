@@ -32,7 +32,7 @@ GROQ_API_KEY=your_groq_key_here
 
 ## Neo4j Instance
 
-The user's own AuraDB instance (created July 2026, populated from `neo4j_dump_fixed.cypher`):
+The user's own AuraDB instance (created July 2026, populated from `../db/dumps-2026-07/neo4j_dump_fixed.cypher`):
 - URI: `neo4j+s://98adb721.databases.neo4j.io`
 - Username: `98adb721` (AuraDB usernames match the instance ID, not "neo4j")
 - Password: saved in the app's SQLite `connections` table (`backend/users.db`)
@@ -125,7 +125,9 @@ The right panel is tabbed: **Inspect** (the original node detail + NL query), **
 - *Compare works → shared keywords*: clicking a Work in the graph while the Compare tab is active stores `{title, author, keywords}` in `sessionStorage["neoviz_compare"]`. The intersection is computed client-side from properties already in hand, so no extra round-trip. Splits results into "In all N" and "In some".
 - *Normalisation*: `normKey()` in `CypherQueryTester.js` mirrors `canon.py` in the import pipeline — NFKC, curly→straight quotes, en/em dash→hyphen, whitespace collapse, strip edge punctuation (including Urdu `،` `۔`), lowercase. **Change both together or search silently breaks.** Cypher matching also uses `toLower(trim(k))` as a second line of defence.
 
-Data pipeline lives in `data/`: `Bayaaz-e-Hayaat Metadata_Keywords.xlsx` (Nazia's sheet, the source of truth) → `import_keywords_sept.cypher` (generated). `backup_keywords_before_sept_import.json` is the rollback snapshot of keyword state prior to the September import.
+Data pipeline: `../archive/metadata/Bayaaz-e-Hayaat Metadata_Keywords.xlsx` (Nazia's sheet, the source of truth) → `data/import_keywords_sept.cypher` (generated, tracked here). `data/backup_keywords_before_sept_import.json` is the rollback snapshot of keyword state prior to the September import.
+
+Everything outside the repo sits one level up: `../archive/` holds Nazia's material — `texts/` (scans and digitised Urdu, 142 MB, deliberately unversioned) and `metadata/` (her spreadsheet, plus `file_manifest.csv` mapping each file to its Work record and `image` code). `../design/` holds her mockups and the screen recording. `../db/` holds backups and the July dumps. `../reports/` holds written reports.
 
 **v4 additions (September 2026):**
 - **Dark mode**: `src/theme.js` stamps `data-theme` on `<html>`; every CSS file has a `:root[data-theme="dark"]` token override block plus scoped fixes for hardcoded colors. The iframe gets its theme via `buildResultsPageContent(data, { theme })` — theme switches re-render the last result set from `lastRecordsRef`. Toggle lives in the graph navbar; persisted in `localStorage["neoviz_theme"]`.

@@ -11,12 +11,14 @@ const jwt = require("jsonwebtoken");
 const db = require("./db");
 const { authMiddleware, SECRET } = require("./middleware");
 const submissionsRouter = require("./submissions");
+const publicRouter = require("./public");
 
 const app = express();
 const api = express.Router();
 
 app.use(cors({ origin: config.corsOrigin }));
 app.use(express.json());
+api.use("/public", publicRouter);
 api.use(submissionsRouter);
 api.post("/connect", authMiddleware, async (req, res) => {
   let { uri, username, password } = req.body;
