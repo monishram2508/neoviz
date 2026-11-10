@@ -58,7 +58,7 @@ router.get("/works", wrap(async (req, res) => {
     limit,
     works: filtered.slice(offset, offset + limit).map(publicWork),
     selected: selected.map((s) => ({ label: s })),
-    facets: facetsFor(data, filtered, selected).slice(0, 120),
+    facets: facetsFor(data, filtered, selected),
     mode
   });
 }));

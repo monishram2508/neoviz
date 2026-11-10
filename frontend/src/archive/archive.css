@@ -586,6 +586,7 @@
 }
 
 .bh-graph {
+  position: relative;
   background: var(--surface);
   border: 1px solid var(--rule);
   overflow: hidden;
@@ -599,6 +600,10 @@
   font-size: 10px;
   fill: var(--ink-soft);
   pointer-events: none;
+  paint-order: stroke;
+  stroke: var(--surface);
+  stroke-width: 3px;
+  stroke-linejoin: round;
 }
 .bh-graph .lbl-author { font-size: 11.5px; font-weight: 600; fill: var(--ink); }
 
@@ -630,4 +635,132 @@
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ink-faint);
+}
+
+.bh-search {
+  display: block;
+  width: 100%;
+  max-width: 360px;
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--rule-firm);
+  border-radius: 2px;
+}
+.bh-search::placeholder { color: var(--ink-faint); }
+.bh-search:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.bh-search-rail { max-width: none; margin-top: 14px; padding: 7px 10px; font-size: 13px; }
+
+.bh-letters {
+  position: sticky;
+  top: 66px;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding-block: 8px;
+  margin-bottom: 18px;
+  background: var(--ground);
+  border-bottom: 1px solid var(--rule);
+}
+.bh-letters button {
+  min-width: 28px;
+  height: 28px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--brand);
+  background: transparent;
+  border: none;
+  border-radius: 2px;
+  cursor: pointer;
+}
+.bh-letters button:hover:not(:disabled) { background: var(--sunk); }
+.bh-letters button:disabled { color: var(--rule-firm); cursor: default; }
+.bh-letter-head {
+  grid-column: 1 / -1;
+  margin: 10px 0 -6px;
+  padding-bottom: 6px;
+  font-family: var(--f-display);
+  font-size: 26px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--brand);
+  border-bottom: 1px solid var(--rule);
+}
+.bh-letter-head:first-child { margin-top: 0; }
+[data-letter] { scroll-margin-top: 124px; }
+
+.bh-home-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 40px;
+  align-items: start;
+  padding-top: 30px;
+}
+.bh-notable {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  padding: 16px 18px 18px;
+}
+.bh-notable h2 {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 0 0 4px;
+  font-weight: 600;
+}
+.bh-notable ol { list-style: none; margin: 0 0 14px; padding: 0; }
+.bh-notable li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-block: 9px;
+  border-bottom: 1px solid var(--rule);
+}
+.bh-notable li:last-child { border-bottom: none; }
+.bh-notable li a { font-family: var(--f-display); font-size: 18px; color: var(--ink); }
+.bh-notable li a:hover { color: var(--brand); }
+.bh-notable li span { font-size: 12.5px; color: var(--ink-faint); }
+
+.bh-graph svg { cursor: grab; }
+.bh-graph svg:active { cursor: grabbing; }
+.bh-graph .nd { cursor: pointer; }
+.bh-graph .lnk.on { stroke: var(--brand); stroke-width: 1.6; }
+.bh-graph .nd.on .nd-work { stroke: var(--brand); stroke-width: 2; }
+.bh-graph-tools {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  display: flex;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+}
+.bh-graph-tools button {
+  min-width: 34px;
+  height: 30px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 15px;
+  color: var(--ink-soft);
+  background: transparent;
+  border: none;
+  border-left: 1px solid var(--rule);
+  cursor: pointer;
+}
+.bh-graph-tools button:first-child { border-left: none; }
+.bh-graph-tools button:hover { color: var(--brand); background: var(--sunk); }
+
+@media (max-width: 900px) {
+  .bh-home-split { grid-template-columns: 1fr; gap: 24px; }
+}
+
+@media (max-width: 560px) {
+  .bh-letters { position: static; }
+  [data-letter] { scroll-margin-top: 16px; }
 }

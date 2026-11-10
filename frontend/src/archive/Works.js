@@ -1,13 +1,19 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import Cover from "./Cover";
 import GraphView from "./GraphView";
+import LetterBar, { showLetters } from "./LetterBar";
+import { firstLetter, matches } from "./search";
 import { getWorks } from "./api";
+
+const RAIL_LIMIT = 120;
 
 export default function Works() {
   const [params, setParams] = useSearchParams();
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
+  const [query, setQuery] = useState("");
+  const [kwQuery, setKwQuery] = useState("");
 
   const view = params.get("view") === "graph" ? "graph" : "grid";
 
@@ -45,14 +51,18 @@ export default function Works() {
   const setView = (v) => update(selected, mode, v);
 
   const toggle = (label) => {
+    setKwQuery("");
     const has = selected.some((s) => s.toLowerCase() === label.toLowerCase());
     update(has ? selected.filter((s) => s.toLowerCase() !== label.toLowerCase()) : [...selected, label]);
   };
 
   if (error) return <div className="bh-empty">{error}</div>;
 
-  const works = data ? data.works : [];
-  const facets = data ? data.facets : [];
+  const works = data ? data.works.filter((w) => matches(query, w.title, w.author)) : [];
+  const allFacets = data ? data.facets : [];
+  const facets = kwQuery ? allFacets.filter((f) => matches(kwQuery, f.label)) : allFacets.slice(0, RAIL_LIMIT);
+  const letters = new Set(works.map((w) => firstLetter(w.title)));
+  const grouped = showLetters(query, works.length);
 
   return (
     <>
@@ -86,8 +96,21 @@ export default function Works() {
             </div>
           )}
 
+          <input
+            type="search"
+            className="bh-search bh-search-rail"
+            placeholder={`Search ${allFacets.length} keywords`}
+            aria-label="Search keywords"
+            value={kwQuery}
+            onChange={(e) => setKwQuery(e.target.value)}
+          />
+
           <div className="bh-facets">
-            {facets.length === 0 && <p className="bh-card-meta">No further keywords narrow this set.</p>}
+            {facets.length === 0 && (
+              <p className="bh-card-meta">
+                {kwQuery ? <>No keywords match &ldquo;{kwQuery}&rdquo;.</> : "No further keywords narrow this set."}
+              </p>
+            )}
             {facets.map((f) => (
               <button key={f.key} type="button" className="bh-facet" onClick={() => toggle(f.label)}>
                 <span>{f.label}</span>
@@ -102,6 +125,7 @@ export default function Works() {
             <span className="bh-count">
               {data ? (
                 <>
+                  {query && view === "grid" && <><b>{works.length}</b> of </>}
                   <b>{data.total}</b> {data.total === 1 ? "work" : "works"}
                   {selected.length > 0 && ` matching ${mode === "all" ? "all" : "any"} of ${selected.length} keyword${selected.length === 1 ? "" : "s"}`}
                 </>
@@ -125,25 +149,45 @@ export default function Works() {
             </div>
           )}
 
+          {view === "grid" && (
+            <>
+              <input
+                type="search"
+                className="bh-search"
+                placeholder="Search titles or authors"
+                aria-label="Search works"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+              {grouped && <LetterBar letters={letters} />}
+              {query && works.length === 0 && <div className="bh-empty">No works match &ldquo;{query}&rdquo;.</div>}
+            </>
+          )}
+
           {view === "grid" ? (
             <div className="bh-grid">
-              {works.map((w) => (
-                <Link key={w.slug} to={`/works/${w.slug}`} className="bh-card">
-                  <Cover src={null} label={w.title} note={w.hasScan ? "scan pending" : "no scan"} />
-                  <div className="bh-card-body">
-                    <p className="bh-card-title">{w.title}</p>
-                    <p className="bh-card-meta">{w.author || "Author unrecorded"}</p>
-                    <p className="bh-card-meta">{[w.year, w.genre].filter(Boolean).join(" · ")}</p>
-                    <span className="bh-card-view">View</span>
-                  </div>
-                </Link>
+              {works.map((w, i) => (
+                <Fragment key={w.slug}>
+                  {grouped && (i === 0 || firstLetter(works[i - 1].title) !== firstLetter(w.title)) && (
+                    <h2 className="bh-letter-head" data-letter={firstLetter(w.title)}>{firstLetter(w.title)}</h2>
+                  )}
+                  <Link to={`/works/${w.slug}`} className="bh-card">
+                    <Cover src={null} label={w.title} note={w.hasScan ? "scan pending" : "no scan"} />
+                    <div className="bh-card-body">
+                      <p className="bh-card-title">{w.title}</p>
+                      <p className="bh-card-meta">{w.author || "Author unrecorded"}</p>
+                      <p className="bh-card-meta">{[w.year, w.genre].filter(Boolean).join(" · ")}</p>
+                      <span className="bh-card-view">View</span>
+                    </div>
+                  </Link>
+                </Fragment>
               ))}
             </div>
           ) : (
             <GraphView keywords={selected} mode={mode} />
           )}
 
-          {data && data.total > works.length && (
+          {data && !query && data.total > works.length && (
             <p className="bh-sub" style={{ paddingTop: 18 }}>
               Showing the first {works.length} of {data.total}. Add a keyword to narrow further.
             </p>

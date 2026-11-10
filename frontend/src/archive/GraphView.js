@@ -1,55 +1,70 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  forceCollide,
+  forceLink,
+  forceManyBody,
+  forceSimulation,
+  forceX,
+  forceY,
+  select,
+  zoom,
+  zoomIdentity
+} from "d3";
 import { getGraph } from "./api";
 
 const W = 1000;
 const H = 560;
-const CX = W / 2;
-const CY = H / 2;
+const TICKS = 300;
+const FIT_PADDING = 48;
+const MAX_FIT_SCALE = 2.4;
+const ZOOM_STEP = 1.5;
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 10;
+const AUTHOR_LABEL_ZOOM = 1.5;
+const WORK_LABEL_ZOOM = 2.5;
+const HUB_WORKS = 3;
+const DENSE = 60;
+const R_AUTHOR = 6;
+const R_WORK = 5.5;
 
-function layout(nodes, links) {
-  const authors = nodes.filter((n) => n.kind === "author");
-  const works = nodes.filter((n) => n.kind === "work");
-  const worksBy = new Map();
-  links.forEach((l) => {
-    const arr = worksBy.get(l.source) || [];
-    arr.push(l.target);
-    worksBy.set(l.source, arr);
-  });
+const radius = (n, degree) => (n.kind === "author" ? R_AUTHOR + 1.6 * Math.sqrt(degree.get(n.id) || 0) : R_WORK);
 
-  const pos = new Map();
-  const ring = Math.min(CX, CY) - 96;
-  const single = authors.length === 1;
-
-  authors.forEach((a, i) => {
-    const angle = single ? 0 : (i / authors.length) * Math.PI * 2 - Math.PI / 2;
-    const ax = single ? CX : CX + Math.cos(angle) * ring * 0.62;
-    const ay = single ? CY : CY + Math.sin(angle) * ring * 0.62;
-    pos.set(a.id, { x: ax, y: ay });
-
-    const kids = worksBy.get(a.id) || [];
-    const full = single;
-    const spread = full ? Math.PI * 2 : Math.PI * 1.05;
-    const base = full ? -Math.PI / 2 : angle - spread / 2;
-    const r = full ? Math.min(CX, CY) - 130 : Math.min(74 + kids.length * 5, 132);
-    const divisor = full ? kids.length : Math.max(kids.length - 1, 1);
-    kids.forEach((id, j) => {
-      const t = kids.length === 1 && !full ? 0.5 : j / divisor;
-      const ang = base + spread * t;
-      pos.set(id, { x: ax + Math.cos(ang) * r, y: ay + Math.sin(ang) * r });
-    });
-  });
-
-  let loose = 0;
-  works.forEach((w) => {
-    if (pos.has(w.id)) return;
-    const ang = (loose / Math.max(works.length, 1)) * Math.PI * 2;
-    pos.set(w.id, { x: CX + Math.cos(ang) * (ring + 40), y: CY + Math.sin(ang) * (ring + 40) });
-    loose += 1;
-  });
-
-  return pos;
+function degrees(links) {
+  return links.reduce((m, l) => m.set(l.source, (m.get(l.source) || 0) + 1), new Map());
 }
+
+function settle(nodes, links, degree) {
+  const ids = new Set(nodes.map((n) => n.id));
+  const simNodes = nodes.map((n) => ({ ...n }));
+  const simLinks = links.filter((l) => ids.has(l.source) && ids.has(l.target)).map((l) => ({ ...l }));
+  forceSimulation(simNodes)
+    .force("link", forceLink(simLinks).id((n) => n.id).distance(30).strength(0.9))
+    .force("charge", forceManyBody().strength((n) => (n.kind === "author" ? -260 : -45)))
+    .force("collide", forceCollide((n) => radius(n, degree) + (n.kind === "author" ? 14 : 4)))
+    .force("x", forceX(0).strength(0.035))
+    .force("y", forceY(0).strength(0.09))
+    .stop()
+    .tick(TICKS);
+  return new Map(simNodes.map((n) => [n.id, { x: n.x, y: n.y }]));
+}
+
+function fitTransform(pos) {
+  const pts = [...pos.values()];
+  if (!pts.length) return zoomIdentity;
+  const xs = pts.map((p) => p.x);
+  const ys = pts.map((p) => p.y);
+  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  const k = Math.min(
+    (W - 2 * FIT_PADDING) / Math.max(x1 - x0, 1),
+    (H - 2 * FIT_PADDING) / Math.max(y1 - y0, 1),
+    MAX_FIT_SCALE
+  );
+  return zoomIdentity.translate(W / 2 - (k * (x0 + x1)) / 2, H / 2 - (k * (y0 + y1)) / 2).scale(k);
+}
+
+const motion = (ms) =>
+  window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : ms;
 
 const clip = (s, n) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
@@ -57,6 +72,9 @@ export default function GraphView({ keywords, mode }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [hover, setHover] = useState(null);
+  const [t, setT] = useState(zoomIdentity);
+  const svgRef = useRef(null);
+  const zoomRef = useRef(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -70,79 +88,103 @@ export default function GraphView({ keywords, mode }) {
     };
   }, [keywords, mode]);
 
-  const pos = useMemo(() => (data ? layout(data.nodes, data.links) : null), [data]);
+  const degree = useMemo(() => (data ? degrees(data.links) : new Map()), [data]);
+  const pos = useMemo(() => (data ? settle(data.nodes, data.links, degree) : null), [data, degree]);
+  const fit = useMemo(() => (pos ? fitTransform(pos) : zoomIdentity), [pos]);
+
+  useEffect(() => {
+    if (!svgRef.current) return undefined;
+    const behavior = zoom()
+      .scaleExtent([fit.k * MIN_ZOOM, fit.k * MAX_ZOOM])
+      .filter((e) => (e.type === "wheel" ? e.ctrlKey || e.metaKey : !e.button))
+      .on("zoom", (e) => setT(e.transform));
+    const svg = select(svgRef.current).call(behavior).call(behavior.transform, fit);
+    zoomRef.current = behavior;
+    return () => svg.on(".zoom", null);
+  }, [fit]);
+
+  const zoomBy = (factor) =>
+    select(svgRef.current).transition().duration(motion(250)).call(zoomRef.current.scaleBy, factor);
+  const refit = () =>
+    select(svgRef.current).transition().duration(motion(400)).call(zoomRef.current.transform, fit);
 
   if (error) return <div className="bh-empty">{error}</div>;
   if (!data) return <div className="bh-empty">Loading graph&hellip;</div>;
   if (!data.nodes.length) return <div className="bh-empty">Nothing to draw for this selection.</div>;
 
   const authors = data.nodes.filter((n) => n.kind === "author");
-  const dense = data.nodes.length > 60;
-  const showLabels = !dense;
+  const dense = data.nodes.length > DENSE;
+  const showAuthorLabels = !dense || t.k >= fit.k * AUTHOR_LABEL_ZOOM;
+  const showWorkLabels = !dense || t.k >= fit.k * WORK_LABEL_ZOOM;
+  const at = (id) => {
+    const p = pos.get(id);
+    return p ? t.apply([p.x, p.y]) : null;
+  };
+  const view = data.nodes
+    .filter((n) => pos.has(n.id))
+    .map((n) => {
+      const isAuthor = n.kind === "author";
+      const lit = hover === n.id;
+      const labelled = lit || (isAuthor
+        ? showAuthorLabels || (degree.get(n.id) || 0) >= HUB_WORKS
+        : showWorkLabels);
+      return { n, p: at(n.id), r: radius(n, degree) + (lit ? 2 : 0), isAuthor, lit, labelled };
+    });
 
   return (
     <>
       <div className="bh-graph">
-        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Authors and their works">
+        <div className="bh-graph-tools" role="group" aria-label="Graph zoom">
+          <button type="button" onClick={() => zoomBy(ZOOM_STEP)} aria-label="Zoom in">+</button>
+          <button type="button" onClick={() => zoomBy(1 / ZOOM_STEP)} aria-label="Zoom out">&minus;</button>
+          <button type="button" onClick={refit}>Fit</button>
+        </div>
+
+        <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Authors and their works">
           <g>
             {data.links.map((l, i) => {
-              const a = pos.get(l.source);
-              const b = pos.get(l.target);
+              const a = at(l.source);
+              const b = at(l.target);
               if (!a || !b) return null;
               const lit = hover && (hover === l.source || hover === l.target);
-              return (
-                <line
-                  key={i}
-                  className="lnk"
-                  x1={a.x}
-                  y1={a.y}
-                  x2={b.x}
-                  y2={b.y}
-                  style={lit ? { stroke: "var(--brand)", strokeWidth: 1.6 } : undefined}
-                />
-              );
+              return <line key={i} className={`lnk${lit ? " on" : ""}`} x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} />;
             })}
           </g>
 
-          {data.nodes.map((n) => {
-            const p = pos.get(n.id);
-            if (!p) return null;
-            const isAuthor = n.kind === "author";
-            const r = isAuthor ? 9 : 5.5;
-            const lit = hover === n.id;
-            return (
-              <g
+          {view.map(({ n, p, r, isAuthor, lit }) => (
+            <g
+              key={n.id}
+              className={`nd${lit ? " on" : ""}`}
+              transform={`translate(${p[0]} ${p[1]})`}
+              onMouseEnter={() => setHover(n.id)}
+              onMouseLeave={() => setHover(null)}
+              onClick={() => navigate(isAuthor ? `/authors/${n.slug}` : `/works/${n.slug}`)}
+            >
+              <circle className={isAuthor ? "nd-author" : "nd-work"} r={r} />
+            </g>
+          ))}
+
+          <g>
+            {view.filter((v) => v.labelled).map(({ n, p, r, isAuthor }) => (
+              <text
                 key={n.id}
-                transform={`translate(${p.x} ${p.y})`}
-                style={{ cursor: isAuthor ? "pointer" : "pointer" }}
-                onMouseEnter={() => setHover(n.id)}
-                onMouseLeave={() => setHover(null)}
-                onClick={() => navigate(isAuthor ? `/authors/${n.slug}` : `/works/${n.slug}`)}
+                className={isAuthor ? "lbl-author" : undefined}
+                x={p[0]}
+                y={p[1] - r - 6}
+                textAnchor="middle"
               >
-                <circle
-                  className={isAuthor ? "nd-author" : "nd-work"}
-                  r={lit ? r + 2 : r}
-                  style={lit && !isAuthor ? { stroke: "var(--brand)", strokeWidth: 2 } : undefined}
-                />
-                {(showLabels || isAuthor || lit) && (
-                  <text
-                    className={isAuthor ? "lbl-author" : undefined}
-                    y={isAuthor ? -15 : -10}
-                    textAnchor="middle"
-                  >
-                    {clip(n.label, isAuthor ? 28 : 22)}
-                  </text>
-                )}
-              </g>
-            );
-          })}
+                {clip(n.label, isAuthor ? 28 : 22)}
+              </text>
+            ))}
+          </g>
         </svg>
       </div>
 
       <p className="bh-sub" style={{ paddingTop: 12 }}>
-        {authors.length} {authors.length === 1 ? "author" : "authors"} &middot;{" "}
-        {data.nodes.length - authors.length} works
-        {dense && " · labels hidden while the selection is broad — add a keyword to thin it out"}
+        {authors.length} {authors.length === 1 ? "author" : "authors"} &middot; {data.nodes.length - authors.length} works
+        &middot; drag to move, pinch or &#8984;/Ctrl + scroll to zoom
+        {!showAuthorLabels && " · zoom in to see every name"}
+        {showAuthorLabels && !showWorkLabels && " · zoom in further to see work titles"}
         {data.truncated && " · showing the first 300"}
       </p>
     </>
