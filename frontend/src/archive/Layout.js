@@ -14,8 +14,6 @@ const NAV = [
   { to: "/contribute", label: "Contribute" }
 ];
 
-const AUTH_PAGES = ["/signin", "/join"];
-
 const navClass = ({ isActive }) => (isActive ? "on" : undefined);
 
 function useWaitingCount(canReview) {
@@ -56,10 +54,9 @@ function AccountLinks() {
   if (loading) return <div className="bh-acct" aria-busy="true" />;
 
   if (!account) {
-    const here = AUTH_PAGES.includes(pathname) ? "/" : pathname + search;
     return (
       <div className="bh-acct">
-        <NavLink to={`/signin?next=${encodeURIComponent(here)}`} className={navClass}>Sign in</NavLink>
+        <NavLink to={`/signin?next=${encodeURIComponent(pathname + search)}`} className={navClass}>Sign in</NavLink>
       </div>);
 
   }
@@ -121,11 +118,6 @@ export default function Layout() {
           </div>
         }
       </main>
-
-      <footer className="bh-foot">
-        Bay&#257;z-e-Hay&#257;t &middot; a literary archive of Hyderabad
-        {meta && meta.works ? ` · ${meta.works} works by ${meta.authors} authors` : ""}
-      </footer>
     </div>);
 
 }

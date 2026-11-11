@@ -33,8 +33,6 @@ function App() {
             <Route path="/authors/:slug" element={<Author />} />
             <Route path="/works" element={<Works />} />
             <Route path="/works/:slug" element={<Work />} />
-            <Route path="/signin" element={<SignIn />} />
-            <Route path="/join" element={<Join />} />
             <Route path="/contribute" element={<Contribute />} />
             <Route path="/people/:id" element={<Profile />} />
             <Route path="/review" element={<Review />} />
@@ -42,6 +40,8 @@ function App() {
             <Route path="/system" element={<System />} />
           </Route>
 
+          <Route path="/signin" element={<SignIn />} />
+          <Route path="/join" element={<Join />} />
           <Route path="/login" element={<Navigate to="/signin" replace />} />
           <Route path="/register" element={<Navigate to="/join" replace />} />
 

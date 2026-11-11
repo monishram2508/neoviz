@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import AuthShell, { PasswordField } from "./AuthShell";
 import { register } from "./memberApi";
 import { safeNext, useAccount } from "./account";
 
@@ -32,14 +33,15 @@ export default function Join() {
   };
 
   return (
-    <section className="bh-narrow">
-      <header className="bh-page-head">
-        <h1 className="bh-h1">Join the archive</h1>
-        <p className="bh-sub">
-          Anyone can browse. An account lets you add context, sources and corrections, which a
-          moderator reviews before they appear.
-        </p>
-      </header>
+    <AuthShell
+      title="Create an account"
+      subtitle="Add notes, sources and corrections to the archive."
+      aside={
+      <>
+          Already have an account?{" "}
+          <Link className="bh-link" to={`/signin?next=${encodeURIComponent(next)}`} replace>Sign in</Link>
+        </>
+      }>
 
       <form className="bh-form" onSubmit={onSubmit}>
         <label className="bh-field">
@@ -47,13 +49,14 @@ export default function Join() {
           <input
             className="bh-input"
             autoComplete="nickname"
+            autoFocus
             required
             minLength={2}
             maxLength={40}
             value={form.displayName}
             onChange={set("displayName")} />
 
-          <small>Shown next to everything you contribute. 2–40 characters.</small>
+          <small>Shown next to everything you contribute.</small>
         </label>
         <label className="bh-field">
           <span>Email</span>
@@ -66,35 +69,24 @@ export default function Join() {
             onChange={set("email")} />
 
         </label>
-        <label className="bh-field">
-          <span>Password</span>
-          <input
-            className="bh-input"
-            type="password"
-            autoComplete="new-password"
-            required
-            minLength={8}
-            value={form.password}
-            onChange={set("password")} />
+        <PasswordField
+          label="Password"
+          hint="At least 8 characters."
+          autoComplete="new-password"
+          minLength={8}
+          value={form.password}
+          onChange={set("password")} />
 
-          <small>At least 8 characters.</small>
-        </label>
         <label className="bh-check">
           <input type="checkbox" checked={form.showEmail} onChange={set("showEmail")} />
           <span>Show my email on my profile</span>
         </label>
         {error && <p className="bh-error" role="alert">{error}</p>}
-        <div className="bh-actions">
-          <button className="bh-btn" type="submit" disabled={busy}>
-            {busy ? "Creating your account…" : "Join"}
-          </button>
-        </div>
+        <button className="bh-btn block" type="submit" disabled={busy}>
+          {busy ? "Creating your account…" : "Create account"}
+        </button>
+        <p className="bh-auth-fine">A moderator reviews every contribution before it appears on the site.</p>
       </form>
-
-      <p className="bh-sub bh-after">
-        Already have an account?{" "}
-        <Link className="bh-link" to={`/signin?next=${encodeURIComponent(next)}`}>Sign in</Link>
-      </p>
-    </section>);
+    </AuthShell>);
 
 }

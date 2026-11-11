@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import AuthShell, { PasswordField } from "./AuthShell";
 import { login } from "./memberApi";
 import { safeNext, useAccount } from "./account";
 
@@ -28,11 +29,15 @@ export default function SignIn() {
   };
 
   return (
-    <section className="bh-narrow">
-      <header className="bh-page-head">
-        <h1 className="bh-h1">Sign in</h1>
-        <p className="bh-sub">Sign in to add notes, sources and corrections to the archive.</p>
-      </header>
+    <AuthShell
+      title="Sign in"
+      subtitle="Welcome back. Sign in to contribute to the archive."
+      aside={
+      <>
+          New to the archive?{" "}
+          <Link className="bh-link" to={`/join?next=${encodeURIComponent(next)}`} replace>Create an account</Link>
+        </>
+      }>
 
       <form className="bh-form" onSubmit={onSubmit}>
         <label className="bh-field">
@@ -41,34 +46,23 @@ export default function SignIn() {
             className="bh-input"
             type="email"
             autoComplete="email"
+            autoFocus
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)} />
 
         </label>
-        <label className="bh-field">
-          <span>Password</span>
-          <input
-            className="bh-input"
-            type="password"
-            autoComplete="current-password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)} />
+        <PasswordField
+          label="Password"
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)} />
 
-        </label>
         {error && <p className="bh-error" role="alert">{error}</p>}
-        <div className="bh-actions">
-          <button className="bh-btn" type="submit" disabled={busy}>
-            {busy ? "Signing in…" : "Sign in"}
-          </button>
-        </div>
+        <button className="bh-btn block" type="submit" disabled={busy}>
+          {busy ? "Signing in…" : "Sign in"}
+        </button>
       </form>
-
-      <p className="bh-sub bh-after">
-        No account yet?{" "}
-        <Link className="bh-link" to={`/join?next=${encodeURIComponent(next)}`}>Join the archive</Link>
-      </p>
-    </section>);
+    </AuthShell>);
 
 }
