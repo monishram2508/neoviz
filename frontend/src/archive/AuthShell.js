@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import BrandMark from "./BrandMark";
 import "./archive.css";
 
 export function PasswordField({ label, hint, autoComplete, minLength, value, onChange }) {
@@ -46,7 +47,7 @@ export default function AuthShell({ title, subtitle, aside, children }) {
       </button>
       <main className="bh-auth-main">
         <div className="bh-auth-card">
-          <Link to="/" className="bh-auth-mark">Bay&#257;z-e-Hay&#257;t</Link>
+          <BrandMark className="bh-auth-mark" />
           <h1 className="bh-auth-title">{title}</h1>
           {subtitle && <p className="bh-auth-sub">{subtitle}</p>}
           {children}

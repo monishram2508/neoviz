@@ -4,6 +4,7 @@ import { getMeta } from "./api";
 import { QUEUE_EVENT, getQueue } from "./memberApi";
 import { atLeast, useAccount } from "./account";
 import { longDate } from "./format";
+import BrandMark from "./BrandMark";
 import "./archive.css";
 
 const NAV = [
@@ -97,7 +98,7 @@ export default function Layout() {
     <div className="bh">
       <header className="bh-head">
         <div className="bh-head-in">
-          <NavLink to="/" className="bh-mark">Bay&#257;z-e-Hay&#257;t</NavLink>
+          <BrandMark className="bh-mark" />
           <nav className="bh-nav">
             {NAV.map((n) =>
             <NavLink key={n.to} to={n.to} end={n.end} className={navClass}>

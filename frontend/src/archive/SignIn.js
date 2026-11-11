@@ -31,7 +31,7 @@ export default function SignIn() {
   return (
     <AuthShell
       title="Sign in"
-      subtitle="Welcome back. Sign in to contribute to the archive."
+      subtitle="Welcome back"
       aside={
       <>
           New to the archive?{" "}
