@@ -65,8 +65,7 @@ async function fromNeo4j() {
   return { authorRows, workRows };
 }
 
-function fromSnapshot() {
-  const raw = JSON.parse(fs.readFileSync(SNAPSHOT, "utf8"));
+function fromSnapshot(raw) {
   const byId = new Map(raw.nodes.map((n) => [n.nid, n]));
   const authorNodes = raw.nodes.filter((n) => n.labels.includes("Author"));
   const workNodes = raw.nodes.filter((n) => n.labels.includes("Work"));
@@ -162,21 +161,70 @@ function build({ authorRows, workRows }, source) {
   };
 }
 
+const readJson = (file) => JSON.parse(fs.readFileSync(file, "utf8"));
+
+function writeLiveSnapshot(rows, file = config.archiveLiveSnapshot) {
+  const tmp = `${file}.tmp`;
+  const body = { takenAt: new Date().toISOString(), authorRows: rows.authorRows, workRows: rows.workRows };
+  fs.writeFileSync(tmp, JSON.stringify(body));
+  fs.renameSync(tmp, file);
+}
+
+function saveLive(rows) {
+  try {
+    writeLiveSnapshot(rows);
+  } catch (err) {
+    console.error("Could not write the live archive snapshot:", err.message);
+  }
+}
+
+function readLive() {
+  const file = config.archiveLiveSnapshot;
+  if (!fs.existsSync(file)) return null;
+  try {
+    const { takenAt, authorRows, workRows } = readJson(file);
+    if (!Array.isArray(authorRows) || !Array.isArray(workRows)) throw new Error("rows are missing");
+    return { rows: { authorRows, workRows }, takenAt: takenAt || null };
+  } catch (err) {
+    console.error("Ignoring the unreadable live archive snapshot:", err.message);
+    return null;
+  }
+}
+
+function readFallback() {
+  const live = readLive();
+  if (live) return live;
+  const raw = readJson(SNAPSHOT);
+  return { rows: fromSnapshot(raw), takenAt: raw.takenAt || null };
+}
+
+const hasFallback = () => fs.existsSync(config.archiveLiveSnapshot) || fs.existsSync(SNAPSHOT);
+
+async function loadFresh() {
+  try {
+    const rows = await fromNeo4j();
+    const built = build(rows, "neo4j");
+    saveLive(rows);
+    return { ...built, meta: { ...built.meta, takenAt: built.meta.loadedAt } };
+  } catch (err) {
+    if (!hasFallback()) throw err;
+    const { rows, takenAt } = readFallback();
+    const built = build(rows, "snapshot");
+    return { ...built, meta: { ...built.meta, takenAt, neo4jError: err.code || err.message } };
+  }
+}
+
 async function load({ force = false } = {}) {
   if (cache && !force) return cache;
-  if (loading) return loading;
-  loading = (async () => {
-    try {
-      cache = build(await fromNeo4j(), "neo4j");
-    } catch (err) {
-      if (!fs.existsSync(SNAPSHOT)) throw err;
-      cache = build(fromSnapshot(), "snapshot");
-      cache.meta.neo4jError = err.code || err.message;
-    } finally {
-      loading = null;
-    }
+  if (loading) return force ? loading.catch(() => null).then(() => load({ force: true })) : loading;
+  loading = loadFresh().
+  then((fresh) => {
+    cache = fresh;
     return cache;
-  })();
+  }).
+  finally(() => {
+    loading = null;
+  });
   return loading;
 }
 
@@ -218,4 +266,13 @@ const publicWork = (w) => ({
   orphan: w.orphan
 });
 
-module.exports = { load, selectWorks, facetsFor, publicWork, slugify, SNAPSHOT };
+module.exports = {
+  load,
+  selectWorks,
+  facetsFor,
+  publicWork,
+  slugify,
+  writeLiveSnapshot,
+  readFallback,
+  SNAPSHOT
+};

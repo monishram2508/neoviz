@@ -10,14 +10,33 @@ const asBool = (v, fallback) => {
   return /^(1|true|yes|on)$/i.test(String(v));
 };
 
+const emailList = (v) =>
+(v || "").
+split(",").
+map((e) => e.trim().toLowerCase()).
+filter(Boolean);
+
+const asTrustProxy = (v) => {
+  const s = String(v || "").trim();
+  if (!s || /^(false|no|off)$/i.test(s)) return false;
+  if (/^(true|yes|on)$/i.test(s)) return true;
+  return /^\d+$/.test(s) ? Number(s) : s;
+};
+
+const dbFile = process.env.DB_FILE ?
+path.resolve(ROOT, process.env.DB_FILE) :
+path.join(ROOT, "users.db");
+
 const config = {
   root: ROOT,
   port: Number(process.env.PORT) || 3001,
   nodeEnv: process.env.NODE_ENV || "development",
 
-  dbFile: process.env.DB_FILE ?
-  path.resolve(ROOT, process.env.DB_FILE) :
-  path.join(ROOT, "users.db"),
+  dbFile,
+
+  archiveLiveSnapshot: process.env.ARCHIVE_LIVE_SNAPSHOT ?
+  path.resolve(ROOT, process.env.ARCHIVE_LIVE_SNAPSHOT) :
+  path.join(path.dirname(dbFile), "archive_live.json"),
 
   uploadDir: process.env.UPLOAD_DIR ?
   path.resolve(ROOT, process.env.UPLOAD_DIR) :
@@ -40,10 +59,10 @@ const config = {
     password: process.env.ARCHIVE_NEO4J_PASSWORD
   },
 
-  moderatorEmails: (process.env.MODERATOR_EMAILS || "").
-  split(",").
-  map((e) => e.trim().toLowerCase()).
-  filter(Boolean),
+  moderatorEmails: emailList(process.env.MODERATOR_EMAILS),
+  adminEmails: emailList(process.env.ADMIN_EMAILS),
+  sysadminEmails: emailList(process.env.SYSADMIN_EMAILS),
+  trustProxy: asTrustProxy(process.env.TRUST_PROXY),
 
   corsOrigin: process.env.CORS_ORIGIN || "*",
   serveFrontend: asBool(process.env.SERVE_FRONTEND, process.env.NODE_ENV === "production")

@@ -1,5 +1,6 @@
 const express = require("express");
 const { load, selectWorks, facetsFor, publicWork } = require("./archiveCache");
+const { approvedFor, publicProfile } = require("./people");
 
 const router = express.Router();
 
@@ -37,7 +38,7 @@ router.get("/authors/:slug", wrap(async (req, res) => {
   const author = data.authors.find((a) => a.slug === req.params.slug);
   if (!author) return res.status(404).json({ error: "No such author" });
   const works = data.works.filter((w) => w.authorSlug === author.slug).map(publicWork);
-  res.json({ author: { ...author, portraits: [] }, works });
+  res.json({ author: { ...author, portraits: [] }, works, contributions: await approvedFor("author", author.name) });
 }));
 
 router.get("/works", wrap(async (req, res) => {
@@ -70,8 +71,15 @@ router.get("/works/:slug", wrap(async (req, res) => {
   const author = data.authors.find((a) => a.slug === work.authorSlug) || null;
   res.json({
     work: { ...publicWork(work), images: [] },
-    author: author ? { slug: author.slug, name: author.name, bio: author.bio } : null
+    author: author ? { slug: author.slug, name: author.name, bio: author.bio } : null,
+    contributions: await approvedFor("work", work.title)
   });
+}));
+
+router.get("/people/:id", wrap(async (req, res) => {
+  const profile = await publicProfile(Number(req.params.id), await load());
+  if (!profile) return res.status(404).json({ error: "No such person" });
+  res.json(profile);
 }));
 
 router.get("/keywords", wrap(async (req, res) => {

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import Cover from "./Cover";
 import RichText from "./RichText";
+import { ContributionsSection } from "./ContributionItem";
 import { getWork } from "./api";
 
 export default function Work() {
@@ -77,6 +78,12 @@ export default function Work() {
           </span>
         </div>
       )}
+
+      <ContributionsSection
+        items={data.contributions || []}
+        contributeHref={`/contribute?work=${encodeURIComponent(work.slug)}`}
+        label="work"
+      />
 
       <div className="bh-panel">
         <h2>Manuscript</h2>

@@ -2,6 +2,7 @@ const jwt = require("jsonwebtoken");
 const db = require("./db");
 
 const { config } = require("./config");
+const { effectiveRole, atLeast } = require("./roles");
 
 const SECRET = config.jwtSecret;
 
@@ -24,25 +25,37 @@ function authMiddleware(req, res, next) {
 }
 
 function loadRole(req, res, next) {
-  db.get("SELECT id, email, role FROM users WHERE id = ?", [req.user.id], (err, row) => {
-    if (err) return res.status(500).json({ error: "Database error" });
-    if (!row) return res.status(403).json({ error: "Account no longer exists" });
-    req.account = { id: row.id, email: row.email, role: row.role || "contributor" };
-    next();
-  });
+  db.get(
+    "SELECT id, email, role, display_name, disabled_at FROM users WHERE id = ?",
+    [req.user.id],
+    (err, row) => {
+      if (err) return res.status(500).json({ error: "Database error" });
+      if (!row) return res.status(403).json({ error: "Account no longer exists" });
+      if (row.disabled_at) return res.status(403).json({ error: "This account is disabled" });
+      req.account = {
+        id: row.id,
+        email: row.email,
+        role: effectiveRole(row, config.sysadminEmails),
+        displayName: row.display_name || null
+      };
+      next();
+    }
+  );
 }
 
-function requireRole(...roles) {
+function requireRole(min) {
   return [
     authMiddleware,
     loadRole,
     (req, res, next) => {
-      if (!roles.includes(req.account.role)) {
-        return res.status(403).json({ error: `Requires role: ${roles.join(" or ")}` });
+      if (!atLeast(req.account.role, min)) {
+        return res.status(403).json({ error: `Requires ${min} or higher` });
       }
       next();
     }
   ];
 }
 
-module.exports = { authMiddleware, loadRole, requireRole, SECRET };
+const asyncRoute = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
+
+module.exports = { authMiddleware, loadRole, requireRole, asyncRoute, SECRET };

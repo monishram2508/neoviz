@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import Carousel from "./Carousel";
 import Cover from "./Cover";
+import { ContributionsSection } from "./ContributionItem";
 import { getAuthor } from "./api";
 
 export default function Author() {
@@ -48,6 +49,11 @@ export default function Author() {
               {author.bio || <span className="bh-pending">Biography pending</span>}
             </div>
           </div>
+          <ContributionsSection
+            items={data.contributions || []}
+            contributeHref={`/contribute?author=${encodeURIComponent(author.slug)}`}
+            label="author"
+          />
         </div>
 
         <div>

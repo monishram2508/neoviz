@@ -1,4 +1,9 @@
-import { fold, matches, firstLetter } from "./search";
+import { fold, matches, firstLetter, duplicateKeys } from "./search";
+
+test("duplicateKeys finds titles shared by more than one record, ignoring case and spaces", () => {
+  const works = [{ title: "Mundadugu" }, { title: " mundadugu" }, { title: "Zindagi" }];
+  expect([...duplicateKeys(works, "title")]).toEqual(["mundadugu"]);
+});
 
 test("fold strips diacritics and case", () => {
   expect(fold("  Bayāz-e-Hayāt ")).toBe("bayaz-e-hayat");

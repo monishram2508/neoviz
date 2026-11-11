@@ -1,0 +1,16 @@
+{
+  "takenAt": "2026-09-14T00:00:00.000Z",
+  "nodes": [
+    { "nid": 1, "labels": ["Author"], "p": { "name": "Test Author", "language": "Urdu", "bio": "Old bio" } },
+    { "nid": 2, "labels": ["Author"], "p": { "name": "Twin Author", "language": "Telugu" } },
+    { "nid": 3, "labels": ["Author"], "p": { "name": "Twin Author", "language": "Telugu" } },
+    { "nid": 10, "labels": ["Work"], "p": { "title": "First Work", "year": "1950", "engInfo": "Old description", "keywords": ["memory"] } },
+    { "nid": 11, "labels": ["Work"], "p": { "title": "Same Title", "year": "1945" } },
+    { "nid": 12, "labels": ["Work"], "p": { "title": "Same Title", "year": "1980" } }
+  ],
+  "rels": [
+    { "t": "WROTE", "a": 1, "b": 10 },
+    { "t": "WROTE", "a": 1, "b": 11 },
+    { "t": "WROTE", "a": 2, "b": 12 }
+  ]
+}

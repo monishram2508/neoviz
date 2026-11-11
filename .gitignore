@@ -4,9 +4,10 @@ venv/
 build/
 *.log
 .env
-users.db
+users.db*
 uploads/
 
 # eval run artifacts — keep the directory, not the output
 eval/results/*
 !eval/results/.gitkeep
+archive_live.json*

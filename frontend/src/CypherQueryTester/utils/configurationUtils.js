@@ -49,16 +49,6 @@ export const saveConnectionRecord = async ({ uri, username, password, name }) =>
   });
 };
 
-export const sendContributionText = async ({ text }) => {
-  const response = await fetch(`${API_BASE_URL}/sendContribution`, {
-    method: "POST",
-    headers: buildAuthHeaders(),
-    body: JSON.stringify({ text })
-  });
-
-  return response.json();
-};
-
 export const runConfigurationQuery = async ({ cypher, uri, username, password }) => {
   const response = await fetch(`${API_BASE_URL}/query`, {
     method: "POST",

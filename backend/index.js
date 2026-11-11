@@ -6,21 +6,27 @@ const { config, checkConfig } = require("./config");
 
 checkConfig();
 
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
 const db = require("./db");
-const { authMiddleware, SECRET } = require("./middleware");
+const { requireRole } = require("./middleware");
+const authRouter = require("./auth");
 const submissionsRouter = require("./submissions");
+const peopleRouter = require("./people");
+const adminRouter = require("./admin");
 const publicRouter = require("./public");
 
 const app = express();
 const api = express.Router();
+const sysadminOnly = requireRole("sysadmin");
 
+if (config.trustProxy !== false) app.set("trust proxy", config.trustProxy);
 app.use(cors({ origin: config.corsOrigin }));
 app.use(express.json());
 api.use("/public", publicRouter);
+api.use(authRouter);
 api.use(submissionsRouter);
-api.post("/connect", authMiddleware, async (req, res) => {
+api.use(peopleRouter);
+api.use(adminRouter);
+api.post("/connect", sysadminOnly, async (req, res) => {
   let { uri, username, password } = req.body;
 
   if (!uri && req.body.connectionId) {
@@ -68,7 +74,7 @@ api.post("/connect", authMiddleware, async (req, res) => {
     await driver.close();
   }
 });
-api.post("/query", authMiddleware, async (req, res) => {
+api.post("/query", sysadminOnly, async (req, res) => {
   let { cypher, uri, username, password } = req.body;
 
   if (!uri && req.body.connectionId) {
@@ -117,61 +123,7 @@ api.post("/query", authMiddleware, async (req, res) => {
   }
 });
 
-api.post("/register", async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) {
-    return res.status(400).json({ error: "Missing fields" });
-  }
-
-  const hashed = await bcrypt.hash(password, 10);
-
-  const role = config.moderatorEmails.includes(String(email).trim().toLowerCase()) ?
-  "moderator" :
-  "contributor";
-
-  db.run(
-    "INSERT INTO users (email, password, role) VALUES (?, ?, ?)",
-    [email, hashed, role],
-    function (err) {
-      if (err) {
-        return res.status(400).json({ error: "User already exists" });
-      }
-      res.json({ success: true, role });
-    }
-  );
-});
-
-api.post("/login", (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) {
-    return res.status(400).json({ error: "Missing fields" });
-  }
-
-  db.get("SELECT * FROM users WHERE email = ?", [email], async (err, user) => {
-    if (err) return res.status(500).json({ error: "Database error" });
-    if (!user) return res.status(400).json({ error: "User not found" });
-
-    const match = await bcrypt.compare(password, user.password);
-    if (!match) return res.status(400).json({ error: "Wrong password" });
-
-    const token = jwt.sign({ id: user.id }, SECRET);
-
-    res.json({ token });
-  });
-});
-
-api.get("/me", authMiddleware, (req, res) => {
-  db.get(
-    "SELECT email, role, neo4j_uri, neo4j_username, neo4j_password FROM users WHERE id = ?",
-    [req.user.id],
-    (err, user) => {
-      if (!user) return res.json({});
-      res.json({ ...user, role: user.role || "contributor" });
-    }
-  );
-});
-
-api.get("/connections", authMiddleware, (req, res) => {
+api.get("/connections", sysadminOnly, (req, res) => {
   db.all(
     "SELECT id, uri, username, password, name FROM connections WHERE user_id = ?",
     [req.user.id],
@@ -184,7 +136,7 @@ api.get("/connections", authMiddleware, (req, res) => {
   );
 });
 
-api.post("/save-connection", authMiddleware, (req, res) => {
+api.post("/save-connection", sysadminOnly, (req, res) => {
   const { uri, username, password, name } = req.body;
 
   db.run(
@@ -201,7 +153,7 @@ api.post("/save-connection", authMiddleware, (req, res) => {
   );
 });
 
-api.post("/nl-query", authMiddleware, async (req, res) => {
+api.post("/nl-query", sysadminOnly, async (req, res) => {
   const { question, uri, username, password, nodeLabel } = req.body;
 
   if (!question || !uri || !username || !password) {
@@ -309,7 +261,7 @@ api.post("/nl-query", authMiddleware, async (req, res) => {
   }
 });
 
-api.post("/explain", authMiddleware, async (req, res) => {
+api.post("/explain", sysadminOnly, async (req, res) => {
   const { question, cypher, summary } = req.body;
   if (!summary) return res.status(400).json({ error: "Missing result summary" });
 
@@ -349,10 +301,14 @@ api.post("/explain", authMiddleware, async (req, res) => {
   }
 });
 
-api.post("/sendContribution", authMiddleware, (req, res) => {
-});
-
 app.use("/api", api);
+
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  const status = err.status || err.statusCode || 500;
+  if (status >= 500) console.error(err);
+  res.status(status).json({ error: status >= 500 ? "Something went wrong on the server" : err.message });
+});
 
 if (config.serveFrontend) {
   const fs = require("fs");
@@ -368,7 +324,18 @@ if (config.serveFrontend) {
   }
 }
 
-app.listen(config.port, () => {
-  console.log(`Backend listening on port ${config.port}`);
-  console.log(`  API under /api  |  database ${config.dbFile}`);
-});
+if (require.main === module) {
+  db.ready.
+  then(() =>
+  app.listen(config.port, () => {
+    console.log(`Backend listening on port ${config.port}`);
+    console.log(`  API under /api  |  database ${config.dbFile}`);
+  })
+  ).
+  catch((err) => {
+    console.error("Database setup failed:", err.message);
+    process.exit(1);
+  });
+}
+
+module.exports = app;

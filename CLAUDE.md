@@ -75,19 +75,18 @@ backend/
 
 ## Backend API
 
-All routes require JWT except `/register` and `/login`.
+Everything is under `/api`. Public archive routes (`/api/public/*`) need no login. The NeoViz tool routes below are **sysadmin-only**; account, contribution, people and system routes are listed in the November 2026 section further down.
 
 | Route | Method | Purpose |
 |---|---|---|
-| `/register` | POST | Create user (bcrypt hashed password → SQLite) |
-| `/login` | POST | Returns JWT token |
+| `/register`, `/login` | POST | Accounts (`backend/auth.js`) |
+| `/me` | GET, PATCH | Current account; display name and show-email |
 | `/connect` | POST | Validate Neo4j creds, return node labels |
 | `/query` | POST | Run raw Cypher, return records |
 | `/nl-query` | POST | NL → Groq → Cypher → Neo4j → returns `{ data, cypher }` |
+| `/explain` | POST | Plain-English summary of a result |
 | `/save-connection` | POST | Save Neo4j connection to SQLite |
 | `/connections` | GET | List saved connections for user |
-| `/me` | GET | Current user info |
-| `/sendContribution` | POST | Empty stub — not implemented |
 
 ## Design System (v3 — light neutral)
 
@@ -164,13 +163,36 @@ Public-archive groundwork, backend only — no UI yet.
 - Roles live in `users.role` (`reader`/`contributor`/`moderator`), looked up **from the database on every request** (`loadRole`) rather than trusted from the JWT, so a demotion takes effect immediately and old tokens can't carry stale privileges. `MODERATOR_EMAILS` in `.env` seeds moderators at boot and at registration.
 - Uploads: multer → `backend/uploads/` (gitignored), 20 MB cap, extension allowlist, random filenames. Rejected uploads are unlinked, not left on disk.
 
+**Contributions, moderation and roles (November 2026):**
+
+Design: `docs/superpowers/specs/2026-11-11-contributions-design.md`. Plan: `docs/superpowers/plans/2026-11-11-contributions.md`. Hosting: `docs/deploy-mac-mini.md`.
+
+- **Roles** (`backend/roles.js`): contributor 0 < moderator 1 < admin 2 < sysadmin 3. Stored roles are contributor / moderator / admin (legacy `reader` = contributor). **Sysadmin is never stored**: `loadRole` derives it from `SYSADMIN_EMAILS` on every request. You can only change, disable or delete accounts strictly below your rank, and only assign roles strictly below it. `ADMIN_EMAILS` / `MODERATOR_EMAILS` promote at boot and registration and never demote.
+- **Accounts** (`backend/auth.js`, `backend/limits.js`): display name 2–40 chars, password ≥ 8, emails lowercased, one generic login error, JWT 7 days. Rate limits are off when `NODE_ENV=test`. Disabled accounts cannot sign in and their tokens get 403.
+- **Contribution types** (`backend/contributions.js`): note, citation, correction (work `year` / `engInfo` / `urduInfo`, author `bio`), add_keywords, new_work. Notes and citations live only in SQLite. The other three write Neo4j on approval, then reload the cache. If Neo4j is unreachable the approval returns 503 and the item stays pending.
+- **Duplicate guard**: a target whose title or name matches more than one record is refused at submit and at approval. Today that means `Mundadugu` ×2 and `Chalapathi Vijayvardhanam` ×2.
+- **Lifecycle**: pending → approved / rejected / changes_requested. The owner can edit or withdraw while pending or changes-requested. Admins retract approved notes and citations. Decide is a conditional update, so a second moderator gets 409. Reject and request-changes need a reason. Moderators cannot decide their own items; admins and sysadmins can.
+- **Activity log** (`backend/audit.js`, table `audit_log`): append-only, 14 actions, written right after each change. No route edits or deletes it.
+- **Live snapshot**: after every successful Neo4j load the server writes `ARCHIVE_LIVE_SNAPSHOT` (default `archive_live.json` next to `DB_FILE`). When offline it loads that, else the 14 September backup. The site banner takes its date from `meta.takenAt`.
+- **API**:
+  - `/api/public/works/:slug` and `/authors/:slug` include approved `contributions`. `/api/public/people/:id` is the public profile; email appears only if the person opted in.
+  - Signed-in routes: `/api/submissions*` (create, edit, withdraw, history, queue, preview, decide, retract) and `/api/people/:id/full`.
+  - Admin+: `/api/users*` and `/api/audit`. Sysadmin: `/api/system` and `/api/system/reload`.
+- **Frontend** (archive pages inside `Layout`): `/signin`, `/join`, `/contribute`, `/people/:id`, `/review`, `/admin`, `/system`.
+  - Helpers: `archive/account.js` (`AccountProvider`, `useAccount`, `atLeast`, `safeNext`), `archive/memberApi.js` (signed-in calls; announces queue changes so the header count refreshes) and `archive/format.js` (SQLite timestamps are UTC, and Safari cannot parse them raw; activity wording).
+  - `/login` and `/register` redirect to the new pages. The old `src/Auth/` is gone.
+- **Tests**:
+  - Backend: `cd backend && npm test` (node:test; integration tests boot the app on a temp SQLite file with `test/fixtures/snapshot.json` and no Neo4j).
+  - Frontend: `cd frontend && CI=true npx react-scripts test --watchAll=false src/archive`.
+- With `ARCHIVE_NEO4J_URI` set but unreachable, each Neo4j call waits about 30 s (the driver's connection timeout) before falling back or returning 503.
+
 **Still needed:**
-- Frontend for the above: `/contribute`, `/my-submissions`, `/moderate` pages
-- Phase B of uploads — the copyright question (can contributors upload full texts of in-copyright works?) must be settled with Nazia before building it
-- The app still sends the user's own Neo4j credentials from the browser with every query. That is fine while the user *is* the admin, but **must be replaced by the server-side archive connection before any public signup**, or a contributor would hold write access to the whole archive.
-- `Mundadugu` exists twice in the DB with conflicting years (1945 vs 1980) and two variant author nodes ("Sunkara and Vasireddi" vs "Sunkara Satyanarayana and V. Bhaskara Rao") — needs a human decision, likely Nazia's team
-- Replace remaining `alert()` popups in `Configuration.js` with inline error UI
-- `/sendContribution` endpoint is an empty stub
+- Email verification: designed in the spec, not built until the developer says so.
+- Phase B of uploads: the copyright question (can contributors upload full texts of in-copyright works?) must be settled with Nazia first. The public new-work form has no file field.
+- Whether the website or Nazia's spreadsheet is the master copy after launch. This decides the spreadsheet import merge and any CSV export of approved changes.
+- The NeoViz tool still sends Neo4j credentials from the browser. It is now sysadmin-only, but moving it onto the server-side archive connection is still open.
+- `Mundadugu` exists twice in the DB with conflicting years (1945 vs 1980) and two variant author nodes ("Sunkara and Vasireddi" vs "Sunkara Satyanarayana and V. Bhaskara Rao"). It needs a human decision, likely by Nazia's team. Until then the duplicate guard refuses contributions to it.
+- Replace remaining `alert()` popups in `Configuration.js` with inline error UI.
 
 ## Key Gotchas
 
