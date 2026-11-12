@@ -13,7 +13,7 @@ const shared = {
   standardHeaders: true,
   legacyHeaders: false,
   skip: () => config.nodeEnv === "test",
-  message: { error: "Too many attempts. Try again later." }
+  message: { error: "Too many attempts. Please try again later." }
 };
 
 const authLimiter = rateLimit({ ...shared, windowMs: AUTH_WINDOW, limit: AUTH_LIMIT });

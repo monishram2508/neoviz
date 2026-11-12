@@ -17,3 +17,17 @@ test("fallback prefers the live snapshot and reports its date", async (t) => {
   assert.deepEqual(data.authors.map((a) => a.name), ["Live Author"]);
   assert.notEqual(data.meta.takenAt, "2026-09-14T00:00:00.000Z");
 });
+
+test("public meta hides the database error while the cache keeps it", async (t) => {
+  const { base, stop } = await startServer();
+  t.after(stop);
+  const cache = require("../archiveCache");
+
+  const data = await cache.load({ force: true });
+  assert.equal(data.meta.source, "snapshot");
+  assert.ok(data.meta.neo4jError);
+
+  const meta = (await api(base, "/api/public/meta")).body;
+  assert.equal(meta.source, "snapshot");
+  assert.equal("neo4jError" in meta, false);
+});

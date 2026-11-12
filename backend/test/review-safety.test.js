@@ -2,7 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { startServer, api, join } = require("./helpers");
 
-const OFFLINE = "The archive database is offline — try again later.";
+const OFFLINE = "The archive database is temporarily unavailable. Please try again later.";
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const fixYear = { type: "correction", targetKind: "work", target: "First Work", field: "year", value: "1951", reason: "Library record" };
 

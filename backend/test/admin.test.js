@@ -24,7 +24,7 @@ test("people management", async (t) => {
 
   assert.equal((await api(base, `/api/users/${annId}/disable`, { token: root, method: "POST" })).status, 200);
   assert.equal((await api(base, "/api/me", { token: ann })).status, 403);
-  assert.equal((await api(base, "/api/login", { body: { email: "ann@test.dev", password: "password123" } })).body.error, "This account is disabled");
+  assert.equal((await api(base, "/api/login", { body: { email: "ann@test.dev", password: "password123" } })).body.error, "This account has been disabled. Please contact an administrator.");
 
   assert.equal((await api(base, "/api/system", { token: boss })).status, 403);
   assert.equal((await api(base, "/api/system", { token: root })).body.archive.source, "snapshot");

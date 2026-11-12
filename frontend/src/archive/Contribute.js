@@ -7,9 +7,9 @@ import { useAccount } from "./account";
 import { duplicateKeys, keyOf, matches } from "./search";
 
 const WORK_LIMIT = 200;
-const SUCCESS = "Thanks — this is waiting for review.";
-const NO_NAME = "Set a display name on your profile before contributing.";
-const DUPLICATE_LABEL = "Duplicate record — waiting for the archive team";
+const SUCCESS = "Thank you. Your contribution has been submitted for review.";
+const NO_NAME = "Add a display name in your profile settings before contributing.";
+const DUPLICATE_LABEL = "Duplicate record";
 const DUPLICATE_COPY =
 "This title matches more than one record in the archive. The archive team needs to resolve the duplicate first.";
 
@@ -28,7 +28,7 @@ const TYPE_INFO = {
 const STARTS = [
 { params: { pick: "work" }, title: "An existing work", text: "Add a note, a source, a correction or keywords to a work." },
 { params: { pick: "author" }, title: "An author", text: "Add a note, a source or a correction to an author's page." },
-{ params: { new: "work" }, title: "A new work", text: "Tell us about a work that is missing from the archive." }];
+{ params: { new: "work" }, title: "A new work", text: "Suggest a work that is not yet in the archive." }];
 
 
 const FIELD = { work: "title", author: "name" };
@@ -37,7 +37,7 @@ function Head() {
   return (
     <header className="bh-page-head">
       <h1 className="bh-h1">Contribute</h1>
-      <p className="bh-sub">Everything you add is checked by a moderator before it appears on the site.</p>
+      <p className="bh-sub">All contributions are reviewed by a moderator before they are published.</p>
     </header>);
 
 }
@@ -47,10 +47,10 @@ function SignedOut({ next }) {
   return (
     <section className="bh-narrow">
       <Head />
-      <p className="bh-lede">You need an account to contribute.</p>
+      <p className="bh-lede">Sign in or create an account to contribute.</p>
       <div className="bh-actions">
         <Link className="bh-btn" to={`/signin${query}`}>Sign in</Link>
-        <Link className="bh-btn quiet" to={`/join${query}`}>Join</Link>
+        <Link className="bh-btn quiet" to={`/join${query}`}>Create account</Link>
       </div>
     </section>);
 
@@ -62,7 +62,7 @@ function NeedsName({ id }) {
       <Head />
       <p className="bh-error">{NO_NAME}</p>
       <div className="bh-actions bh-after">
-        <Link className="bh-btn" to={`/people/${id}`}>Go to your profile</Link>
+        <Link className="bh-btn" to="/settings">Go to profile settings</Link>
       </div>
     </section>);
 
@@ -74,8 +74,8 @@ function Done({ account, onAgain }) {
       <Head />
       <p className="bh-ok" role="status">{SUCCESS}</p>
       <div className="bh-actions bh-after">
-        <Link className="bh-btn" to={`/people/${account.id}`}>See it on your profile</Link>
-        <button type="button" className="bh-btn quiet" onClick={onAgain}>Contribute something else</button>
+        <Link className="bh-btn" to={`/people/${account.id}`}>View on your profile</Link>
+        <button type="button" className="bh-btn quiet" onClick={onAgain}>Submit another contribution</button>
       </div>
     </section>);
 
@@ -205,14 +205,14 @@ function Target({ kind, slug, items, onSend, go }) {
     return (
       <>
         <div className="bh-empty">That {kind} isn’t in the archive.</div>
-        <button type="button" className="bh-linkbtn bh-after" onClick={back}>Choose another</button>
+        <button type="button" className="bh-linkbtn bh-after" onClick={back}>Change selection</button>
       </>);
 
   }
   if (duplicateKeys(items, FIELD[kind]).has(keyOf(item[FIELD[kind]]))) {
     return (
       <>
-        <Bar label={DUPLICATE_LABEL} title={item[FIELD[kind]]} onBack={back} backLabel="Choose another" />
+        <Bar label={DUPLICATE_LABEL} title={item[FIELD[kind]]} onBack={back} backLabel="Change selection" />
         <div className="bh-empty">{DUPLICATE_COPY}</div>
       </>);
 
@@ -263,7 +263,7 @@ function Wizard({ account }) {
 
     }
     if (!workSlug && !authorSlug && !FIELD[pick]) return <Start go={go} />;
-    if (!lists) return <p className="bh-sub">Loading the archive…</p>;
+    if (!lists) return <p className="bh-sub">Loading…</p>;
     if (workSlug) return <Target kind="work" slug={workSlug} items={lists.work} onSend={onSend} go={go} />;
     if (authorSlug) return <Target kind="author" slug={authorSlug} items={lists.author} onSend={onSend} go={go} />;
     return <Picker kind={pick} items={lists[pick]} onPick={(slug) => go({ [pick]: slug })} onBack={() => go({})} />;

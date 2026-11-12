@@ -16,8 +16,7 @@ import Join from "./archive/Join";
 import Contribute from "./archive/Contribute";
 import Profile from "./archive/Profile";
 import Review from "./archive/Review";
-import Admin from "./archive/Admin";
-import System from "./archive/System";
+import Settings from "./archive/Settings";
 import { AccountProvider } from "./archive/account";
 import "./theme";
 
@@ -36,8 +35,10 @@ function App() {
             <Route path="/contribute" element={<Contribute />} />
             <Route path="/people/:id" element={<Profile />} />
             <Route path="/review" element={<Review />} />
-            <Route path="/admin" element={<Admin />} />
-            <Route path="/system" element={<System />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/settings/:section" element={<Settings />} />
+            <Route path="/admin" element={<Navigate to="/settings/users" replace />} />
+            <Route path="/system" element={<Navigate to="/settings/system" replace />} />
           </Route>
 
           <Route path="/signin" element={<SignIn />} />

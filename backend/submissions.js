@@ -166,7 +166,7 @@ asyncRoute(async (req, res, next) => {
 
 function locate(data, kind, key) {
   const found = resolveTarget(data, kind, key);
-  if (found.status === "missing") return { status: 400, error: `No such ${kind} in the archive` };
+  if (found.status === "missing") return { status: 400, error: `This ${kind} could not be found in the archive.` };
   if (found.status === "duplicate") return { status: 409, error: MESSAGES.duplicate };
   return { node: found.node };
 }

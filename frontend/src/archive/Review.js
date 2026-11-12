@@ -7,13 +7,13 @@ import { TYPE_LABELS, actorLabel, ago, dateTime, describeEvent } from "./format"
 import { decide, getHistory, getPreview, getQueue, retract } from "./memberApi";
 
 const TABS = [
-{ key: "waiting", label: "Waiting", status: "pending" },
+{ key: "waiting", label: "Pending", status: "pending" },
 { key: "changes", label: "Changes requested", status: "changes_requested" },
-{ key: "decided", label: "Decided", status: "approved,rejected,withdrawn,retracted" }];
+{ key: "decided", label: "Resolved", status: "approved,rejected,withdrawn,retracted" }];
 
 
 const STATUS_LABELS = {
-  pending: "Waiting",
+  pending: "Pending",
   changes_requested: "Changes requested",
   approved: "Approved",
   rejected: "Rejected",
@@ -85,7 +85,7 @@ function KeywordPlan({ item, plan, overrides, setOverrides }) {
           <Chips title="Matched to existing keywords" items={keywords.matchedExisting.map((m) => `${m.submitted} → ${m.canonical}`)} />
           {keywords.newToArchive.length > 0 &&
         <div>
-              <span className="bh-step-h">New to the archive</span>
+              <span className="bh-step-h">Not yet in the archive</span>
               {keywords.newToArchive.map((k) =>
           <label key={k} className="bh-field bh-override">
                   <span>{k}</span>
@@ -183,7 +183,7 @@ function Decide({ item, plan, overrides, onDone, onConflict }) {
       <label className="bh-field">
         <span>Reason</span>
         <textarea className="bh-textarea short" maxLength={REASON_MAX} value={reason} onChange={(e) => setReason(e.target.value)} />
-        <small>Required to reject or ask for changes. The contributor sees the reason, not who decided.</small>
+        <small>Required when rejecting or requesting changes. The contributor will see this reason, but not who made the decision.</small>
       </label>
       {error && <p className="bh-error" role="alert">{error}</p>}
       <div className="bh-actions">
@@ -214,7 +214,7 @@ function Retract({ item, onDone }) {
       <label className="bh-field">
         <span>Retract this {item.type === "citation" ? "source" : "note"}</span>
         <textarea className="bh-textarea short" maxLength={REASON_MAX} value={reason} onChange={(e) => setReason(e.target.value)} />
-        <small>It disappears from the public site. The contributor sees the reason.</small>
+        <small>This removes it from the public site. The contributor will see the reason.</small>
       </label>
       {error && <p className="bh-error" role="alert">{error}</p>}
       <div className="bh-actions">
@@ -343,7 +343,7 @@ function Queue({ account }) {
         </div>
         {error && <p className="bh-error">{error}</p>}
         {!items && !error && <p className="bh-sub">Loading…</p>}
-        {items && items.length === 0 && <div className="bh-empty">Nothing here.</div>}
+        {items && items.length === 0 && <div className="bh-empty">No items to show.</div>}
         {items && items.length > 0 &&
         <ul className="bh-pick bh-queue">
             {items.map((s) =>
@@ -376,7 +376,7 @@ function Queue({ account }) {
           onConflict={afterConflict} /> :
 
 
-        <div className="bh-empty">{items && items.length === 0 ? "Nothing to review." : "Choose an item to review."}</div>
+        <div className="bh-empty">{items && items.length === 0 ? "There are no contributions awaiting review." : "Select an item to review."}</div>
         }
       </section>
     </div>);
@@ -387,13 +387,13 @@ export default function Review() {
   const { account, loading } = useAccount();
   if (loading) return <div className="bh-empty bh-page-head">Loading&hellip;</div>;
   if (!account || !atLeast(account.role, "moderator")) {
-    return <div className="bh-empty bh-page-head">You need to be a moderator to see this page.</div>;
+    return <div className="bh-empty bh-page-head">You do not have permission to view this page.</div>;
   }
   return (
     <>
       <header className="bh-page-head">
         <h1 className="bh-h1">Review</h1>
-        <p className="bh-sub">Check each contribution before it reaches the public site.</p>
+        <p className="bh-sub">Approve, reject or request changes to contributions before they are published.</p>
       </header>
       <Queue account={account} />
     </>);

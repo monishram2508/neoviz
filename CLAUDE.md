@@ -178,7 +178,7 @@ Design: `docs/superpowers/specs/2026-11-11-contributions-design.md`. Plan: `docs
   - `/api/public/works/:slug` and `/authors/:slug` include approved `contributions`. `/api/public/people/:id` is the public profile; email appears only if the person opted in.
   - Signed-in routes: `/api/submissions*` (create, edit, withdraw, history, queue, preview, decide, retract) and `/api/people/:id/full`.
   - Admin+: `/api/users*` and `/api/audit`. Sysadmin: `/api/system` and `/api/system/reload`.
-- **Frontend** (archive pages inside `Layout`): `/signin`, `/join`, `/contribute`, `/people/:id`, `/review`, `/admin`, `/system`.
+- **Frontend** (archive pages inside `Layout`): `/contribute`, `/people/:id`, `/review`, `/settings/:section?` (Account: Profile; Administration: Users and Activity log for admins; System: Server status for sysadmins). `/admin` and `/system` redirect to `/settings/users` and `/settings/system`. `/signin` and `/join` sit outside `Layout` with no header.
   - Helpers: `archive/account.js` (`AccountProvider`, `useAccount`, `atLeast`, `safeNext`), `archive/memberApi.js` (signed-in calls; announces queue changes so the header count refreshes) and `archive/format.js` (SQLite timestamps are UTC, and Safari cannot parse them raw; activity wording).
   - `/login` and `/register` redirect to the new pages. The old `src/Auth/` is gone.
 - **Tests**:

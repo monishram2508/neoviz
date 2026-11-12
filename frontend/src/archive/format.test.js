@@ -8,9 +8,10 @@ test("ages read like 3 days ago", () => {
 });
 
 test("activity entries read as plain words", () => {
-  expect(describeEvent({ action: "user.role_changed", details: { from: "contributor", to: "moderator" } })).toBe("changed role to moderator");
+  expect(describeEvent({ action: "user.role_changed", details: { from: "contributor", to: "moderator" } })).toBe("changed role to Moderator");
   expect(describeEvent({ action: "submission.approved", submissionType: "note" })).toBe("approved a note");
   expect(describeEvent({ action: "submission.rejected" })).toBe("rejected a contribution");
+  expect(describeEvent({ action: "submission.created", submissionType: "add_keywords" })).toBe("submitted keywords");
   expect(actorLabel({ actorId: null })).toBe("System");
   expect(actorLabel({ actorId: 4, actorName: null })).toBe("Deleted user");
 });

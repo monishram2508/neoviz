@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { atLeast, useAccount } from "./account";
 import { dateTime, longDate } from "./format";
 import { getSystem, reloadArchive } from "./memberApi";
 
@@ -25,7 +24,7 @@ function Facts({ rows }) {
 
 }
 
-function Status() {
+export function Status() {
   const [info, setInfo] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -85,7 +84,7 @@ function Status() {
           ["Database size", size(info.dbBytes)],
           ["Upload folder", <code>{info.uploadDir}</code>],
           ["Live snapshot", <code>{info.liveSnapshot}</code>],
-          ["Live snapshot saved", info.liveSnapshotExists ? "Yes" : "Not yet — written after the first successful Neo4j load"]]} />
+          ["Live snapshot saved", info.liveSnapshotExists ? "Yes" : "Not yet. It is written after the first successful Neo4j load."]]} />
 
 
       </section>
@@ -95,22 +94,5 @@ function Status() {
         <Link className="bh-link" to="/configuration">Open the NeoViz query tool</Link>
       </section>
     </>);
-
-}
-
-export default function System() {
-  const { account, loading } = useAccount();
-  if (loading) return <div className="bh-empty bh-page-head">Loading&hellip;</div>;
-  if (!account || !atLeast(account.role, "sysadmin")) {
-    return <div className="bh-empty bh-page-head">You need to be a sysadmin to see this page.</div>;
-  }
-  return (
-    <div className="bh-wide">
-      <header className="bh-page-head">
-        <h1 className="bh-h1">System</h1>
-        <p className="bh-sub">Technical status for the people who run the server.</p>
-      </header>
-      <Status />
-    </div>);
 
 }

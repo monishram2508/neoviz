@@ -58,7 +58,7 @@ export const setRole = (uid, role) => post(`users/${id(uid)}/role`, { role });
 export const disableUser = (uid) => post(`users/${id(uid)}/disable`);
 export const enableUser = (uid) => post(`users/${id(uid)}/enable`);
 export const deleteUser = (uid) => send(`users/${id(uid)}`, { method: "DELETE" });
-export const getAudit = ({ before } = {}) => send(`audit${query({ before })}`);
+export const getAudit = ({ before, limit } = {}) => send(`audit${query({ before, limit })}`);
 
 export const getSystem = () => send("system");
 export const reloadArchive = () => post("system/reload");

@@ -29,14 +29,14 @@ const PENDING_MAX = 20;
 const MESSAGES = {
   duplicate:
   "This title matches more than one record in the archive. The archive team needs to resolve the duplicate first.",
-  offline: "The archive database is offline — try again later.",
+  offline: "The archive database is temporarily unavailable. Please try again later.",
   reasonMissing: "A reason is required to reject or request changes.",
-  selfReview: "You can't review your own contribution.",
-  noDisplayName: "Set a display name on your profile before contributing.",
-  pendingCap: `You have ${PENDING_MAX} contributions waiting for review. Please wait for some to be reviewed before adding more.`,
+  selfReview: "You cannot review your own contribution.",
+  noDisplayName: "Add a display name in your profile settings before contributing.",
+  pendingCap: `You have ${PENDING_MAX} contributions awaiting review. Please wait until some have been reviewed before submitting more.`,
   changed: "This contribution changed while you were reviewing it. Check the latest version before deciding.",
-  busy: "Someone is acting on this contribution right now. Try again in a moment.",
-  noVersion: "Reload the contribution and try again: the version you reviewed is missing."
+  busy: "Another reviewer is currently acting on this contribution. Please try again in a moment.",
+  noVersion: "The version you reviewed could not be found. Reload the contribution and try again."
 };
 
 const NOTE_MAX = 4000;

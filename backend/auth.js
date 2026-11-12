@@ -17,7 +17,7 @@ const NAME_MIN = 2;
 const NAME_MAX = 40;
 const BCRYPT_ROUNDS = 10;
 const TOKEN_TTL = "7d";
-const LOGIN_FAILED = "Wrong email or password";
+const LOGIN_FAILED = "Incorrect email or password.";
 
 const cleanName = (v) => String(v ?? "").trim();
 
@@ -62,16 +62,16 @@ router.post("/register", authLimiter, asyncRoute(async (req, res) => {
   const password = String(req.body.password ?? "");
   const displayName = cleanName(req.body.displayName);
 
-  if (!EMAIL_RE.test(email)) return res.status(400).json({ error: "Enter a valid email address" });
+  if (!EMAIL_RE.test(email)) return res.status(400).json({ error: "Please enter a valid email address." });
   if (password.length < PASSWORD_MIN) {
-    return res.status(400).json({ error: `Password must be at least ${PASSWORD_MIN} characters` });
+    return res.status(400).json({ error: `Password must be at least ${PASSWORD_MIN} characters.` });
   }
   const badName = nameError(displayName);
   if (badName) return res.status(400).json({ error: badName });
 
   const taken = await get("SELECT id FROM users WHERE lower(email) = ?", [email]);
   const id = taken ? null : await insertUser(email, await bcrypt.hash(password, BCRYPT_ROUNDS), displayName, req.body.showEmail === true);
-  if (!id) return res.status(400).json({ error: "User already exists" });
+  if (!id) return res.status(400).json({ error: "An account with this email already exists." });
 
   await logEvent({ actorId: id, action: "user.registered", subjectUserId: id });
   res.status(201).json({ token: signToken(id) });
@@ -86,7 +86,7 @@ router.post("/login", authLimiter, asyncRoute(async (req, res) => {
 
   const ok = Boolean(user && user.password) && (await bcrypt.compare(password, user.password));
   if (!ok) return res.status(400).json({ error: LOGIN_FAILED });
-  if (user.disabled_at) return res.status(403).json({ error: "This account is disabled" });
+  if (user.disabled_at) return res.status(403).json({ error: "This account has been disabled. Please contact an administrator." });
 
   res.json({ token: signToken(user.id) });
 }));

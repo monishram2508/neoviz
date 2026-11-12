@@ -15,8 +15,8 @@ const wrap = (fn) => (req, res) => fn(req, res).catch((err) => {
 });
 
 router.get("/meta", wrap(async (req, res) => {
-  const data = await load();
-  res.json(data.meta);
+  const { neo4jError, ...meta } = (await load()).meta;
+  res.json(meta);
 }));
 
 router.get("/authors", wrap(async (req, res) => {
@@ -36,7 +36,7 @@ router.get("/authors", wrap(async (req, res) => {
 router.get("/authors/:slug", wrap(async (req, res) => {
   const data = await load();
   const author = data.authors.find((a) => a.slug === req.params.slug);
-  if (!author) return res.status(404).json({ error: "No such author" });
+  if (!author) return res.status(404).json({ error: "Author not found." });
   const works = data.works.filter((w) => w.authorSlug === author.slug).map(publicWork);
   res.json({ author: { ...author, portraits: [] }, works, contributions: await approvedFor("author", author.name) });
 }));
@@ -67,7 +67,7 @@ router.get("/works", wrap(async (req, res) => {
 router.get("/works/:slug", wrap(async (req, res) => {
   const data = await load();
   const work = data.works.find((w) => w.slug === req.params.slug);
-  if (!work) return res.status(404).json({ error: "No such work" });
+  if (!work) return res.status(404).json({ error: "Work not found." });
   const author = data.authors.find((a) => a.slug === work.authorSlug) || null;
   res.json({
     work: { ...publicWork(work), images: [] },
@@ -78,7 +78,7 @@ router.get("/works/:slug", wrap(async (req, res) => {
 
 router.get("/people/:id", wrap(async (req, res) => {
   const profile = await publicProfile(Number(req.params.id), await load());
-  if (!profile) return res.status(404).json({ error: "No such person" });
+  if (!profile) return res.status(404).json({ error: "User not found." });
   res.json(profile);
 }));
 

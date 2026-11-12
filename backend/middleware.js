@@ -31,7 +31,7 @@ function loadRole(req, res, next) {
     (err, row) => {
       if (err) return res.status(500).json({ error: "Database error" });
       if (!row) return res.status(403).json({ error: "Account no longer exists" });
-      if (row.disabled_at) return res.status(403).json({ error: "This account is disabled" });
+      if (row.disabled_at) return res.status(403).json({ error: "This account has been disabled. Please contact an administrator." });
       req.account = {
         id: row.id,
         email: row.email,

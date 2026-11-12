@@ -14,6 +14,7 @@ export default function Works() {
   const [error, setError] = useState(null);
   const [query, setQuery] = useState("");
   const [kwQuery, setKwQuery] = useState("");
+  const [railOpen, setRailOpen] = useState(false);
 
   const view = params.get("view") === "graph" ? "graph" : "grid";
 
@@ -74,17 +75,18 @@ export default function Works() {
       </div>
 
       <div className="bh-works">
-        <aside className="bh-rail">
+        <aside className={`bh-rail${railOpen ? " open" : ""}`}>
+          <button
+            type="button"
+            className="bh-rail-toggle"
+            aria-expanded={railOpen}
+            aria-controls="bh-rail-body"
+            onClick={() => setRailOpen((open) => !open)}
+          >
+            Filter by keyword{selected.length > 0 && ` (${selected.length} selected)`}
+            <span className="bh-rail-caret" aria-hidden="true" />
+          </button>
           <h2>Keywords</h2>
-
-          <div className="bh-mode" role="group" aria-label="Match mode">
-            <button type="button" className={mode === "all" ? "on" : undefined} onClick={() => update(selected, "all")}>
-              ALL of these
-            </button>
-            <button type="button" className={mode === "any" ? "on" : undefined} onClick={() => update(selected, "any")}>
-              ANY of these
-            </button>
-          </div>
 
           {selected.length > 0 && (
             <div className="bh-chips">
@@ -96,27 +98,38 @@ export default function Works() {
             </div>
           )}
 
-          <input
-            type="search"
-            className="bh-search bh-search-rail"
-            placeholder={`Search ${allFacets.length} keywords`}
-            aria-label="Search keywords"
-            value={kwQuery}
-            onChange={(e) => setKwQuery(e.target.value)}
-          />
-
-          <div className="bh-facets">
-            {facets.length === 0 && (
-              <p className="bh-card-meta">
-                {kwQuery ? <>No keywords match &ldquo;{kwQuery}&rdquo;.</> : "No further keywords narrow this set."}
-              </p>
-            )}
-            {facets.map((f) => (
-              <button key={f.key} type="button" className="bh-facet" onClick={() => toggle(f.label)}>
-                <span>{f.label}</span>
-                <span className="n">{f.count}</span>
+          <div id="bh-rail-body" className="bh-rail-body">
+            <div className="bh-mode" role="group" aria-label="Match mode">
+              <button type="button" className={mode === "all" ? "on" : undefined} onClick={() => update(selected, "all")}>
+                Match all
               </button>
-            ))}
+              <button type="button" className={mode === "any" ? "on" : undefined} onClick={() => update(selected, "any")}>
+                Match any
+              </button>
+            </div>
+
+            <input
+              type="search"
+              className="bh-search bh-search-rail"
+              placeholder={`Search ${allFacets.length} keywords`}
+              aria-label="Search keywords"
+              value={kwQuery}
+              onChange={(e) => setKwQuery(e.target.value)}
+            />
+
+            <div className="bh-facets">
+              {facets.length === 0 && (
+                <p className="bh-card-meta">
+                  {kwQuery ? <>No keywords match &ldquo;{kwQuery}&rdquo;.</> : "No further keywords narrow this set."}
+                </p>
+              )}
+              {facets.map((f) => (
+                <button key={f.key} type="button" className="bh-facet" onClick={() => toggle(f.label)}>
+                  <span>{f.label}</span>
+                  <span className="n">{f.count}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </aside>
 

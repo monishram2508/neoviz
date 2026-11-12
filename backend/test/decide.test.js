@@ -20,13 +20,13 @@ test("moderation decisions", async (t) => {
   assert.equal((await decide(mod2, n1, { decision: "approve" })).status, 409);
 
   const own = await submit(mod, { type: "note", targetKind: "work", target: "First Work", body: "B" });
-  assert.equal((await decide(mod, own, { decision: "approve" })).body.error, "You can't review your own contribution.");
+  assert.equal((await decide(mod, own, { decision: "approve" })).body.error, "You cannot review your own contribution.");
 
   const fix = await submit(ann, { type: "correction", targetKind: "work", target: "First Work", field: "year", value: "1951", reason: "Library record" });
   const preview = await api(base, `/api/submissions/${fix.id}/preview`, { token: mod });
   assert.deepEqual([preview.body.plan.correction.before, preview.body.plan.correction.after], ["1950", "1951"]);
   const offline = await decide(mod, fix, { decision: "approve" });
-  assert.deepEqual([offline.status, offline.body.error], [503, "The archive database is offline — try again later."]);
+  assert.deepEqual([offline.status, offline.body.error], [503, "The archive database is temporarily unavailable. Please try again later."]);
   assert.equal((await api(base, `/api/submissions/${fix.id}`, { token: ann })).body.status, "pending");
 
   const retract = (token, body) => api(base, `/api/submissions/${n1.id}/retract`, { token, body });

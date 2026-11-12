@@ -28,9 +28,9 @@ const shapeUser = (row) => ({
 
 const loadTarget = asyncRoute(async (req, res, next) => {
   const row = await get("SELECT id, email, role, display_name, disabled_at FROM users WHERE id = ?", [req.params.id]);
-  if (!row) return res.status(404).json({ error: "No such user" });
+  if (!row) return res.status(404).json({ error: "User not found." });
   const role = effectiveRole(row, config.sysadminEmails);
-  if (!canManage(req.account.role, role)) return res.status(403).json({ error: "You can't change this account" });
+  if (!canManage(req.account.role, role)) return res.status(403).json({ error: "You do not have permission to change this account." });
   req.target = { ...row, role };
   next();
 });
@@ -49,7 +49,7 @@ router.get("/users", requireRole("admin"), asyncRoute(async (req, res) => {
 
 router.post("/users/:id/role", requireRole("admin"), loadTarget, asyncRoute(async (req, res) => {
   const role = String(req.body.role || "").trim();
-  if (!canAssign(req.account.role, role)) return res.status(403).json({ error: "You can't assign that role" });
+  if (!canAssign(req.account.role, role)) return res.status(403).json({ error: "You do not have permission to assign this role." });
 
   const from = req.target.role;
   await run("UPDATE users SET role = ? WHERE id = ?", [role, req.target.id]);

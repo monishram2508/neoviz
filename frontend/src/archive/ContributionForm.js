@@ -49,7 +49,7 @@ function correctionErrors(values, targetKind) {
   ...(allowed ? [] : ["Choose what to correct"]),
   ...required(values.value, "A new value is required"),
   ...(allowed ? over(values.value, limits[field], `The new ${FIELD_LABELS[field].toLowerCase()}`) : []),
-  ...required(values.reason, "Say why this is correct, for example where you found it"),
+  ...required(values.reason, "Explain why this is correct, for example where you found it"),
   ...over(values.reason, REASON_MAX, "The reason")];
 
 }
@@ -58,7 +58,7 @@ export function formErrors(type, values, targetKind) {
   switch (type) {
     case "note":
       return [
-      ...(text(values.body) || text(values.bodyUrdu) ? [] : ["Write the note in English, Urdu, or both"]),
+      ...(text(values.body) || text(values.bodyUrdu) ? [] : ["Enter the note in English, Urdu or both"]),
       ...over(values.body, NOTE_MAX, "The English note"),
       ...over(values.bodyUrdu, NOTE_MAX, "The Urdu note")];
 
@@ -238,7 +238,7 @@ const FIELDS = {
   new_work: NewWorkFields
 };
 
-export default function ContributionForm({ type, targetKind, current, initial, onSubmit, submitLabel = "Send for review" }) {
+export default function ContributionForm({ type, targetKind, current, initial, onSubmit, submitLabel = "Submit for review" }) {
   const [values, setValues] = useState(() => toValues(initial));
   const [errors, setErrors] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -278,7 +278,7 @@ export default function ContributionForm({ type, targetKind, current, initial, o
       }
       <div className="bh-actions">
         <button className="bh-btn" type="submit" disabled={busy}>
-          {busy ? "Sending…" : submitLabel}
+          {busy ? "Submitting…" : submitLabel}
         </button>
       </div>
     </form>);

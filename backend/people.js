@@ -68,11 +68,11 @@ router.get("/people/:id/full", authMiddleware, loadRole, asyncRoute(async (req, 
   const id = Number(req.params.id);
   const isAdmin = atLeast(req.account.role, "admin");
   if (id !== req.account.id && !isAdmin) {
-    return res.status(403).json({ error: "You can only see your own full profile" });
+    return res.status(403).json({ error: "You do not have permission to view this profile." });
   }
 
   const user = await loadUser(id);
-  if (!user) return res.status(404).json({ error: "No such person" });
+  if (!user) return res.status(404).json({ error: "User not found." });
   const profile = await publicProfile(id, await load());
   const rows = await all(`${SELECT_SUBMISSION} WHERE s.user_id = ? ORDER BY s.created_at DESC, s.id DESC`, [id]);
 

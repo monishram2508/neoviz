@@ -17,7 +17,7 @@ import {
 "./memberApi";
 
 const SECTIONS = [
-["pending", "Waiting for review"],
+["pending", "Pending review"],
 ["changes_requested", "Changes requested"],
 ["rejected", "Rejected"],
 ["retracted", "Retracted"],
@@ -94,7 +94,7 @@ function SubmissionCard({ submission, owner, onChanged }) {
   const editable = owner && EDITABLE.includes(status);
 
   const withdraw = async () => {
-    if (!window.confirm("Withdraw this contribution? It will not be reviewed.")) return;
+    if (!window.confirm("Withdraw this contribution? It will be removed from the review queue.")) return;
     try {
       await withdrawSubmission(submission.id);
       onChanged();
@@ -144,7 +144,7 @@ function SubmissionCard({ submission, owner, onChanged }) {
 
 }
 
-function Settings({ onSaved }) {
+export function ProfileSettings({ onSaved }) {
   const { account, refresh } = useAccount();
   const [name, setName] = useState(account.displayName || "");
   const [show, setShow] = useState(Boolean(account.showEmail));
@@ -156,16 +156,16 @@ function Settings({ onSaved }) {
     try {
       await updateMe({ displayName: name, showEmail: show });
       await refresh();
-      onSaved();
-      setStatus({ ok: "Saved." });
+      onSaved?.();
+      setStatus({ ok: "Changes saved." });
     } catch (err) {
       setStatus({ error: err.message });
     }
   };
 
   return (
-    <section id="settings" className="bh-panel">
-      <h2>Your settings</h2>
+    <section className="bh-panel">
+      <h2>Profile details</h2>
       <form className="bh-form" onSubmit={save}>
         <label className="bh-field">
           <span>Display name</span>
@@ -179,7 +179,7 @@ function Settings({ onSaved }) {
         {status?.error && <p className="bh-error" role="alert">{status.error}</p>}
         {status?.ok && <p className="bh-ok" role="status">{status.ok}</p>}
         <div className="bh-actions">
-          <button className="bh-btn" type="submit">Save</button>
+          <button className="bh-btn" type="submit">Save changes</button>
         </div>
       </form>
     </section>);
@@ -207,7 +207,7 @@ function AdminControls({ person, viewer, onChanged }) {
     if (!window.confirm(question)) return;
     try {
       await deleteUser(person.id);
-      navigate("/admin");
+      navigate("/settings/users");
     } catch (err) {
       setError(err.message);
     }
@@ -240,7 +240,7 @@ function AdminControls({ person, viewer, onChanged }) {
         <button type="button" className="bh-btn small danger" onClick={() => act(() => disableUser(person.id))}>Disable account</button>
         }
         {atLeast(viewer.role, "sysadmin") &&
-        <button type="button" className="bh-btn small danger" onClick={remove}>Delete account</button>
+        <button type="button" className="bh-btn small danger bh-sys" onClick={remove}>Delete account</button>
         }
       </div>
       {error && <p className="bh-error" role="alert">{error}</p>}
@@ -265,7 +265,7 @@ function ActivityLog({ log }) {
         )}
         </ol> :
 
-      <p className="bh-sub">Nothing yet.</p>
+      <p className="bh-sub">No activity yet.</p>
       }
     </section>);
 
@@ -320,7 +320,11 @@ export default function Profile() {
         {facts.length > 0 && <p className="bh-sub">{facts.join(" · ")}</p>}
       </header>
 
-      {owner && <Settings onSaved={load} />}
+      {owner &&
+      <p>
+          <Link className="bh-link" to="/settings">Edit profile settings</Link>
+        </p>
+      }
       {admin && !owner && <AdminControls person={data} viewer={account} onChanged={load} />}
       {full && <OwnSubmissions submissions={data.submissions} owner={owner} onChanged={load} />}
 

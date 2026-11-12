@@ -37,6 +37,13 @@ export const dateTime = (value) => {
   "";
 };
 
+const pad = (n) => String(n).padStart(2, "0");
+
+export const logTime = (value) => {
+  const d = parseDate(value);
+  return d ? `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}` : "";
+};
+
 export const TYPE_LABELS = {
   note: "Note",
   citation: "Source",
@@ -54,29 +61,31 @@ const TYPE_WORDS = {
 };
 
 const SUBMISSION_VERBS = {
-  "submission.created": "sent",
+  "submission.created": "submitted",
   "submission.edited": "edited",
   "submission.withdrawn": "withdrew",
   "submission.approved": "approved",
   "submission.rejected": "rejected",
-  "submission.changes_requested": "asked for changes to",
+  "submission.changes_requested": "requested changes to",
   "submission.retracted": "retracted"
 };
 
 const USER_PHRASES = {
-  "user.registered": "joined the archive",
+  "user.registered": "created an account",
   "user.profile_changed": "updated their profile",
   "user.disabled": "disabled an account",
   "user.enabled": "enabled an account",
-  "archive.reloaded": "reloaded the archive"
+  "archive.reloaded": "reloaded archive data"
 };
+
+const capitalise = (text) => text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
 
 export function describeEvent(event) {
   const details = event.details || {};
   if (SUBMISSION_VERBS[event.action]) {
     return `${SUBMISSION_VERBS[event.action]} ${TYPE_WORDS[event.submissionType] || "a contribution"}`;
   }
-  if (event.action === "user.role_changed") return `changed role to ${details.to}`;
+  if (event.action === "user.role_changed") return `changed role to ${capitalise(details.to)}`;
   if (event.action === "user.deleted") {
     return details.displayName ? `deleted ${details.displayName}'s account` : "deleted an account";
   }

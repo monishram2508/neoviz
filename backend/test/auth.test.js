@@ -14,7 +14,7 @@ test("accounts", async (t) => {
   assert.deepEqual({ ...me.body, id: undefined }, { id: undefined, email: "ann@test.dev", displayName: "Ann", showEmail: false, role: "contributor" });
 
   const bad = await api(base, "/api/login", { body: { email: "nobody@test.dev", password: "password123" } });
-  assert.deepEqual([bad.status, bad.body.error], [400, "Wrong email or password"]);
+  assert.deepEqual([bad.status, bad.body.error], [400, "Incorrect email or password."]);
   assert.equal((await api(base, "/api/login", { body: { email: "ANN@test.dev", password: "password123" } })).status, 200);
 
   assert.equal((await api(base, "/api/query", { token, body: { cypher: "RETURN 1" } })).status, 403);
